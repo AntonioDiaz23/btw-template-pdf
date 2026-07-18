@@ -1,0 +1,32 @@
+namespace Btw.TemplatePdf.Infrastructure.Persistence;
+
+public sealed class TemplateEntity
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string DocumentType { get; set; } = "factura";
+    public string Status { get; set; } = "draft";
+    public int CurrentVersionNumber { get; set; } = 1;
+    /// <summary>Company NIT used for published PDF lookup.</summary>
+    public string Nit { get; set; } = "900000000";
+    public bool SectorSalud { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+
+    public List<TemplateVersionEntity> Versions { get; set; } = new();
+}
+
+public sealed class TemplateVersionEntity
+{
+    public Guid Id { get; set; }
+    public Guid TemplateId { get; set; }
+    public TemplateEntity Template { get; set; } = null!;
+    public int VersionNumber { get; set; }
+    public string Html { get; set; } = string.Empty;
+    public string Css { get; set; } = string.Empty;
+    public string SchemaJson { get; set; } = "{}";
+    public string SampleDataJson { get; set; } = "{}";
+    public string BlocksJson { get; set; } = "[]";
+    public string PageJson { get; set; } = "{}";
+    public DateTimeOffset CreatedAt { get; set; }
+    public bool IsPublished { get; set; }
+}
