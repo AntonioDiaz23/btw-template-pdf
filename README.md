@@ -51,7 +51,11 @@ GET /api/v1/ubl/by-cufe?cufe={CUFE}&typeDocument=UBL
 Upstream:
 `{FeDian:BaseUrl}clientDian/ClientWcfDian/GetDocumentFromDian/{cufe}/{Environment}/false?typeDocument=UBL`
 
-Configure `FeDian` in `appsettings` (`BaseUrl` = URL_FE, `AuthKey` = FeAuthKey).  
+Configure `FeDian` in `appsettings` (`BaseUrl` = URL_FE, `AuthKey` = FeAuthKey).
+
+- Test: `http://192.168.12.70:37128/` (same as netframework `Web.config` / APIService)
+- Prod: `http://192.168.10.55:37128/`
+
 If FE is unreachable and `AllowStubFallback` is true, PDF generation can still use the demo UBL for NIT `900000000`.
 
 Demo PDF request: see `Btw.TemplatePdf.Api.http` (NIT `900000000`).
