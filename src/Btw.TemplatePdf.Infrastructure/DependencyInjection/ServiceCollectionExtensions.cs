@@ -38,7 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IUblStore, FeDianUblStore>();
         services.AddScoped<ITemplateStore, PostgresTemplateStore>();
         services.AddScoped<TemplateCatalogService>();
-        services.AddSingleton<IUblToViewModelMapper, StubUblToViewModelMapper>();
+        services.AddSingleton<IUblToViewModelMapper, DianUblToViewModelMapper>();
         services.AddSingleton<IAssetStore, NullAssetStore>();
         services.AddSingleton<IPdfRenderer, PlaywrightPdfRenderer>();
         services.AddScoped<GeneratePdfByCufeUseCase>();
