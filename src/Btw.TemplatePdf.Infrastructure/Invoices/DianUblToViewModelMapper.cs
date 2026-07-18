@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Xml.Linq;
 using Btw.TemplatePdf.Domain.Abstractions;
 using Btw.TemplatePdf.Domain.Invoices;
+using Microsoft.Extensions.Logging;
 
 namespace Btw.TemplatePdf.Infrastructure.Invoices;
 
@@ -15,6 +16,13 @@ public sealed class DianUblToViewModelMapper : IUblToViewModelMapper
         "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2";
     private static readonly XNamespace Cac =
         "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2";
+
+    private readonly ILogger<DianUblToViewModelMapper> _logger;
+
+    public DianUblToViewModelMapper(ILogger<DianUblToViewModelMapper> logger)
+    {
+        _logger = logger;
+    }
 
     public InvoiceViewModel Map(string nit, string cufe, string ublXml)
     {
@@ -34,6 +42,12 @@ public sealed class DianUblToViewModelMapper : IUblToViewModelMapper
                 $"UBL root '{rootName}' is not supported yet (expected Invoice/CreditNote/DebitNote).");
         }
 
+        _logger.LogInformation(
+            "UBL mapping start nit={Nit} cufe={Cufe} root={Root} xmlLength={Length}",
+            nit,
+            cufe,
+            rootName,
+            ublXml.Length);
         var uuid = First(Val(root, Cbc + "UUID"), cufe);
         var invoiceId = Val(root, Cbc + "ID") ?? string.Empty;
         var (prefijo, numero) = SplitPrefijoNumero(invoiceId);
@@ -228,6 +242,8 @@ public sealed class DianUblToViewModelMapper : IUblToViewModelMapper
                 ["proveedor"] = softwareProviderName ?? "Bythewave S.A.S."
             }
         };
+
+        UblMappingDiagnostics.LogMappedViewModel(_logger, nit, uuid ?? cufe, data);
 
         return new InvoiceViewModel
         {

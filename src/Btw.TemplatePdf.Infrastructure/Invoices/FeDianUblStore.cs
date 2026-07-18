@@ -35,11 +35,21 @@ public sealed class FeDianUblStore : IUblStore
         {
             try
             {
+                _logger.LogInformation(
+                    "Consulting GetDocumentFromDian for UBL nit={Nit} cufe={Cufe} baseUrl={BaseUrl} env={Env}",
+                    nit,
+                    cufe,
+                    _options.BaseUrl,
+                    _options.Environment);
+
                 var ubl = await _client
                     .GetUblXmlAsync(cufe, "UBL", cancellationToken)
                     .ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(ubl))
+                {
+                    UblMappingDiagnostics.LogFetchedUbl(_logger, nit, cufe, ubl, source: "GetDocumentFromDian");
                     return ubl;
+                }
 
                 _logger.LogWarning(
                     "No UBL from GetDocumentFromDian for CUFE {Cufe} (NIT {Nit})",
@@ -64,6 +74,16 @@ public sealed class FeDianUblStore : IUblStore
         if (!_options.AllowStubFallback)
             return null;
 
-        return await _stub.GetUblXmlAsync(nit, cufe, cancellationToken).ConfigureAwait(false);
+        var stub = await _stub.GetUblXmlAsync(nit, cufe, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(stub))
+        {
+            _logger.LogWarning(
+                "Using STUB UBL fallback for nit={Nit} cufe={Cufe} — mapped fields will be demo data, not DIAN.",
+                nit,
+                cufe);
+            UblMappingDiagnostics.LogFetchedUbl(_logger, nit, cufe, stub, source: "StubFallback");
+        }
+
+        return stub;
     }
 }
