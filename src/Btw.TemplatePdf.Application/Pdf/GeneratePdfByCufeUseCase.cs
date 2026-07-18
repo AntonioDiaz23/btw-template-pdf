@@ -1,5 +1,7 @@
+using Btw.TemplatePdf.Application.Common;
 using Btw.TemplatePdf.Domain.Abstractions;
 using Btw.TemplatePdf.Domain.Invoices;
+using FluentValidation;
 
 namespace Btw.TemplatePdf.Application.Pdf;
 
@@ -13,32 +15,35 @@ public sealed class GeneratePdfByCufeUseCase
     private readonly IUblToViewModelMapper _mapper;
     private readonly IAssetStore _assets;
     private readonly IPdfRenderer _renderer;
+    private readonly IValidator<GeneratePdfByCufeRequest> _validator;
 
     public GeneratePdfByCufeUseCase(
         ITemplateStore templates,
         IUblStore ublStore,
         IUblToViewModelMapper mapper,
         IAssetStore assets,
-        IPdfRenderer renderer)
+        IPdfRenderer renderer,
+        IValidator<GeneratePdfByCufeRequest> validator)
     {
         _templates = templates;
         _ublStore = ublStore;
         _mapper = mapper;
         _assets = assets;
         _renderer = renderer;
+        _validator = validator;
     }
 
     public async Task<GeneratePdfByCufeResponse> ExecuteAsync(
         GeneratePdfByCufeRequest request,
         CancellationToken cancellationToken = default)
     {
+        await _validator.ValidateAndThrowAppAsync(request, cancellationToken).ConfigureAwait(false);
+
         var nit = NormalizeNit(request.Nit);
-        var cufe = (request.Cufe ?? string.Empty).Trim();
+        var cufe = request.Cufe.Trim();
 
         if (string.IsNullOrWhiteSpace(nit))
-            throw new PdfGenerationException("validation_error", "nit is required.");
-        if (string.IsNullOrWhiteSpace(cufe))
-            throw new PdfGenerationException("validation_error", "cufe is required.");
+            throw new PdfGenerationException(AppErrorCodes.ValidationError, "nit is required.");
 
         var templateTask = _templates.GetPublishedAsync(nit, request.DocumentType, cancellationToken);
         var ublTask = _ublStore.GetUblXmlAsync(nit, cufe, cancellationToken);
@@ -48,7 +53,7 @@ public sealed class GeneratePdfByCufeUseCase
         if (template is null)
         {
             throw new PdfGenerationException(
-                "template_not_found",
+                AppErrorCodes.TemplateNotFound,
                 $"No published {request.DocumentType} template for NIT {nit}.");
         }
 
@@ -56,7 +61,7 @@ public sealed class GeneratePdfByCufeUseCase
         if (string.IsNullOrWhiteSpace(ublXml))
         {
             throw new PdfGenerationException(
-                "invoice_not_found",
+                AppErrorCodes.InvoiceNotFound,
                 $"No UBL found for NIT {nit} and CUFE {cufe}.");
         }
 
@@ -68,7 +73,7 @@ public sealed class GeneratePdfByCufeUseCase
         catch (Exception ex)
         {
             throw new PdfGenerationException(
-                "mapping_error",
+                AppErrorCodes.MappingError,
                 $"UBL could not be mapped to the invoice view model: {ex.Message}");
         }
 
@@ -85,7 +90,7 @@ public sealed class GeneratePdfByCufeUseCase
         catch (Exception ex)
         {
             throw new PdfGenerationException(
-                "render_error",
+                AppErrorCodes.RenderError,
                 $"PDF render failed: {ex.Message}");
         }
 
@@ -104,9 +109,6 @@ public sealed class GeneratePdfByCufeUseCase
     private static string NormalizeNit(string? nit)
     {
         if (string.IsNullOrWhiteSpace(nit)) return string.Empty;
-        var digits = new string(nit.Where(char.IsDigit).ToArray());
-        // Drop trailing DV if present as single digit after dash was stripped inconsistently:
-        // keep as provided digits; callers should send without DV when possible.
-        return digits;
+        return new string(nit.Where(char.IsDigit).ToArray());
     }
 }

@@ -1,18 +1,19 @@
+using Btw.TemplatePdf.Application.Templates;
 using Btw.TemplatePdf.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Btw.TemplatePdf.Infrastructure.Templates;
 
-public sealed class TemplateCatalogService
+public sealed class PostgresTemplateCatalog : ITemplateCatalog
 {
     private readonly TemplateDbContext _db;
 
-    public TemplateCatalogService(TemplateDbContext db)
+    public PostgresTemplateCatalog(TemplateDbContext db)
     {
         _db = db;
     }
 
-    public async Task<IReadOnlyList<TemplateDto>> ListAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<TemplateDto>> ListAsync(CancellationToken cancellationToken = default)
     {
         return await _db.Templates
             .AsNoTracking()
@@ -26,21 +27,24 @@ public sealed class TemplateCatalogService
                 t.UpdatedAt,
                 t.Nit,
                 t.SectorSalud))
-            .ToListAsync(ct);
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    public async Task<TemplateBundleDto> GetBundleAsync(Guid id, CancellationToken ct = default)
+    public async Task<TemplateBundleDto?> GetBundleAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var template = await _db.Templates
             .AsNoTracking()
             .Include(t => t.Versions)
-            .FirstOrDefaultAsync(t => t.Id == id, ct)
-            ?? throw new KeyNotFoundException("No encontramos esa plantilla.");
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
+            .ConfigureAwait(false);
 
-        return MapBundle(template);
+        return template is null ? null : MapBundle(template);
     }
 
-    public async Task<TemplateDto> CreateAsync(CreateTemplateRequest request, CancellationToken ct = default)
+    public async Task<TemplateDto> CreateAsync(
+        CreateTemplateRequest request,
+        CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
         var templateId = Guid.NewGuid();
@@ -76,19 +80,20 @@ public sealed class TemplateCatalogService
         };
 
         _db.Templates.Add(entity);
-        await _db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return MapTemplate(entity);
     }
 
     public async Task<TemplateVersionDto> SaveDraftAsync(
         Guid id,
         SaveDraftRequest request,
-        CancellationToken ct = default)
+        CancellationToken cancellationToken = default)
     {
         var template = await _db.Templates
             .Include(t => t.Versions)
-            .FirstOrDefaultAsync(t => t.Id == id, ct)
-            ?? throw new KeyNotFoundException("No encontramos esa plantilla.");
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
 
         var current = template.Versions
             .OrderByDescending(v => v.VersionNumber)
@@ -100,8 +105,6 @@ public sealed class TemplateCatalogService
         if (!string.IsNullOrWhiteSpace(request.Nit))
             template.Nit = request.Nit.Trim();
 
-        // After a publish, the next save opens a new draft version (v+1)
-        // so republishing can bump CurrentVersionNumber.
         if (current.IsPublished || template.Status == "published")
         {
             var draft = new TemplateVersionEntity
@@ -121,7 +124,7 @@ public sealed class TemplateCatalogService
             template.Versions.Add(draft);
             template.Status = "draft";
             template.UpdatedAt = now;
-            await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return MapVersion(draft);
         }
 
@@ -138,16 +141,17 @@ public sealed class TemplateCatalogService
         template.Status = "draft";
         template.UpdatedAt = now;
 
-        await _db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return MapVersion(current);
     }
 
-    public async Task<TemplateVersionDto> PublishAsync(Guid id, CancellationToken ct = default)
+    public async Task<TemplateVersionDto> PublishAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var template = await _db.Templates
             .Include(t => t.Versions)
-            .FirstOrDefaultAsync(t => t.Id == id, ct)
-            ?? throw new KeyNotFoundException("No encontramos esa plantilla.");
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
 
         var current = template.Versions
             .OrderByDescending(v => v.VersionNumber)
@@ -155,8 +159,6 @@ public sealed class TemplateCatalogService
 
         var now = DateTimeOffset.UtcNow;
 
-        // Publishing an already-published tip with no edits still clones to v+1
-        // (keeps an explicit release history).
         if (current.IsPublished)
         {
             var next = new TemplateVersionEntity
@@ -179,7 +181,7 @@ public sealed class TemplateCatalogService
             template.CurrentVersionNumber = next.VersionNumber;
             template.Status = "published";
             template.UpdatedAt = now;
-            await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return MapVersion(next);
         }
 
@@ -190,7 +192,7 @@ public sealed class TemplateCatalogService
         template.Status = "published";
         template.CurrentVersionNumber = current.VersionNumber;
         template.UpdatedAt = now;
-        await _db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return MapVersion(current);
     }
 
@@ -218,49 +220,3 @@ public sealed class TemplateCatalogService
             v.CreatedAt,
             v.IsPublished);
 }
-
-public sealed record TemplateDto(
-    Guid Id,
-    string Name,
-    string DocumentType,
-    string Status,
-    int CurrentVersionNumber,
-    DateTimeOffset UpdatedAt,
-    string Nit,
-    bool SectorSalud);
-
-public sealed record TemplateVersionDto(
-    Guid Id,
-    Guid TemplateId,
-    int VersionNumber,
-    string Html,
-    string Css,
-    string SchemaJson,
-    string SampleDataJson,
-    string BlocksJson,
-    DateTimeOffset CreatedAt,
-    bool IsPublished);
-
-public sealed record TemplateBundleDto(TemplateDto Template, IReadOnlyList<TemplateVersionDto> Versions);
-
-public sealed record CreateTemplateRequest(
-    string Name,
-    string DocumentType,
-    string? Nit = null,
-    bool SectorSalud = false,
-    string? Html = null,
-    string? Css = null,
-    string? SchemaJson = null,
-    string? SampleDataJson = null,
-    string? BlocksJson = null,
-    string? PageJson = null);
-
-public sealed record SaveDraftRequest(
-    string Html,
-    string Css,
-    string SchemaJson,
-    string SampleDataJson,
-    string BlocksJson,
-    string? PageJson = null,
-    string? Nit = null,
-    bool? SectorSalud = null);

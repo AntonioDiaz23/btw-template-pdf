@@ -1,6 +1,11 @@
+using Btw.TemplatePdf.Application;
+using Btw.TemplatePdf.Api.Middleware;
 using Btw.TemplatePdf.Infrastructure;
 using Btw.TemplatePdf.Infrastructure.Auth;
 using Btw.TemplatePdf.Infrastructure.Persistence;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +15,33 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
 builder.Services.AddOpenApi();
+builder.Services.AddTemplatePdfApplication();
 builder.Services.AddTemplatePdfInfrastructure(builder.Configuration);
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("Btw.TemplatePdf.Api"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation();
+
+        if (builder.Environment.IsDevelopment())
+            tracing.AddConsoleExporter();
+        else
+            tracing.AddOtlpExporter();
+    })
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation();
+
+        if (builder.Environment.IsDevelopment())
+            metrics.AddConsoleExporter();
+        else
+            metrics.AddOtlpExporter();
+    });
 
 builder.Services.AddCors(options =>
 {
@@ -33,6 +64,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseMiddleware<AppExceptionMiddleware>();
 app.UseCors("Studio");
 
 // Capture FE JWT from studio: Authorization: Bearer <token>

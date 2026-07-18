@@ -1,4 +1,4 @@
-using Btw.TemplatePdf.Infrastructure.Templates;
+using Btw.TemplatePdf.Application.Templates;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Btw.TemplatePdf.Api.Controllers;
@@ -7,31 +7,36 @@ namespace Btw.TemplatePdf.Api.Controllers;
 [Route("api/v1/templates")]
 public sealed class TemplatesController : ControllerBase
 {
-    private readonly TemplateCatalogService _catalog;
+    private readonly ListTemplatesUseCase _list;
+    private readonly GetTemplateUseCase _get;
+    private readonly CreateTemplateUseCase _create;
+    private readonly SaveDraftUseCase _saveDraft;
+    private readonly PublishTemplateUseCase _publish;
 
-    public TemplatesController(TemplateCatalogService catalog)
+    public TemplatesController(
+        ListTemplatesUseCase list,
+        GetTemplateUseCase get,
+        CreateTemplateUseCase create,
+        SaveDraftUseCase saveDraft,
+        PublishTemplateUseCase publish)
     {
-        _catalog = catalog;
+        _list = list;
+        _get = get;
+        _create = create;
+        _saveDraft = saveDraft;
+        _publish = publish;
     }
 
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TemplateDto>>> List(CancellationToken ct)
     {
-        var items = await _catalog.ListAsync(ct);
-        return Ok(items);
+        return Ok(await _list.ExecuteAsync(ct));
     }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<TemplateBundleDto>> Get(Guid id, CancellationToken ct)
     {
-        try
-        {
-            return Ok(await _catalog.GetBundleAsync(id, ct));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { code = "template_not_found", message = ex.Message });
-        }
+        return Ok(await _get.ExecuteAsync(id, ct));
     }
 
     [HttpPost]
@@ -39,10 +44,7 @@ public sealed class TemplatesController : ControllerBase
         [FromBody] CreateTemplateRequest request,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest(new { code = "validation_error", message = "Name is required." });
-
-        var created = await _catalog.CreateAsync(request, ct);
+        var created = await _create.ExecuteAsync(request, ct);
         return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
@@ -52,26 +54,12 @@ public sealed class TemplatesController : ControllerBase
         [FromBody] SaveDraftRequest request,
         CancellationToken ct)
     {
-        try
-        {
-            return Ok(await _catalog.SaveDraftAsync(id, request, ct));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { code = "template_not_found", message = ex.Message });
-        }
+        return Ok(await _saveDraft.ExecuteAsync(id, request, ct));
     }
 
     [HttpPost("{id:guid}/publish")]
     public async Task<ActionResult<TemplateVersionDto>> Publish(Guid id, CancellationToken ct)
     {
-        try
-        {
-            return Ok(await _catalog.PublishAsync(id, ct));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { code = "template_not_found", message = ex.Message });
-        }
+        return Ok(await _publish.ExecuteAsync(id, ct));
     }
 }

@@ -1,3 +1,4 @@
+using Btw.TemplatePdf.Application.Common;
 using Btw.TemplatePdf.Domain.Common;
 
 namespace Btw.TemplatePdf.Application.Pdf;
@@ -17,12 +18,9 @@ public sealed record GeneratePdfByCufeResponse(
     string FileName,
     string PdfBase64);
 
-public sealed class PdfGenerationException : Exception
+public sealed class PdfGenerationException : AppException
 {
-    public string Code { get; }
-
-    public PdfGenerationException(string code, string message) : base(message)
+    public PdfGenerationException(string code, string message) : base(code, message)
     {
-        Code = code;
     }
 }

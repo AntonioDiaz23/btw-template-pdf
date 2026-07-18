@@ -5,4 +5,7 @@
     <Project Path="src/Btw.TemplatePdf.Domain/Btw.TemplatePdf.Domain.csproj" />
     <Project Path="src/Btw.TemplatePdf.Infrastructure/Btw.TemplatePdf.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Btw.TemplatePdf.Application.Tests/Btw.TemplatePdf.Application.Tests.csproj" />
+  </Folder>
 </Solution>

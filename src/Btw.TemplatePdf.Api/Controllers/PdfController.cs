@@ -21,35 +21,15 @@ public sealed class PdfController : ControllerBase
     [ProducesResponseType(typeof(GeneratePdfByCufeResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ByCufe(
+    public async Task<ActionResult<GeneratePdfByCufeResponse>> ByCufe(
         [FromBody] ByCufeBody body,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var documentType = ParseDocumentType(body.DocumentType);
-            var result = await _useCase.ExecuteAsync(
-                new GeneratePdfByCufeRequest(body.Nit, body.Cufe, documentType),
-                cancellationToken);
-            return Ok(result);
-        }
-        catch (PdfGenerationException ex)
-        {
-            var status = ex.Code switch
-            {
-                "validation_error" => StatusCodes.Status400BadRequest,
-                "template_not_found" or "invoice_not_found" => StatusCodes.Status404NotFound,
-                "mapping_error" => StatusCodes.Status422UnprocessableEntity,
-                _ => StatusCodes.Status500InternalServerError
-            };
-
-            return StatusCode(status, new
-            {
-                code = ex.Code,
-                message = ex.Message,
-                traceId = HttpContext.TraceIdentifier
-            });
-        }
+        var documentType = ParseDocumentType(body.DocumentType);
+        var result = await _useCase.ExecuteAsync(
+            new GeneratePdfByCufeRequest(body.Nit, body.Cufe, documentType),
+            cancellationToken);
+        return Ok(result);
     }
 
     private static DocumentType ParseDocumentType(string? value) =>

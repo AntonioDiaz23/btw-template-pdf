@@ -1,4 +1,6 @@
 using Btw.TemplatePdf.Application.Pdf;
+using Btw.TemplatePdf.Application.Templates;
+using Btw.TemplatePdf.Application.Ubl;
 using Btw.TemplatePdf.Domain.Abstractions;
 using Btw.TemplatePdf.Infrastructure.Assets;
 using Btw.TemplatePdf.Infrastructure.Auth;
@@ -25,6 +27,7 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         services.Configure<FeDianOptions>(configuration.GetSection(FeDianOptions.SectionName));
+        services.AddScoped<IFeDianSettings, FeDianSettingsAdapter>();
 
         services.AddScoped<IFeBearerTokenAccessor, FeBearerTokenAccessor>();
 
@@ -38,11 +41,10 @@ public static class DependencyInjection
         services.AddSingleton<UblDiagnosticsWriter>();
         services.AddScoped<IUblStore, FeDianUblStore>();
         services.AddScoped<ITemplateStore, PostgresTemplateStore>();
-        services.AddScoped<TemplateCatalogService>();
+        services.AddScoped<ITemplateCatalog, PostgresTemplateCatalog>();
         services.AddSingleton<IUblToViewModelMapper, DianUblToViewModelMapper>();
         services.AddSingleton<IAssetStore, NullAssetStore>();
         services.AddSingleton<IPdfRenderer, PlaywrightPdfRenderer>();
-        services.AddScoped<GeneratePdfByCufeUseCase>();
         return services;
     }
 }
