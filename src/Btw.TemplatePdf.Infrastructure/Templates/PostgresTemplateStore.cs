@@ -22,14 +22,15 @@ public sealed class PostgresTemplateStore : ITemplateStore
         CancellationToken cancellationToken = default)
     {
         var docType = DocumentTypeMapper.ToApi(documentType);
+        // Prefer the most recently updated published template for this NIT + type.
         var template = await _db.Templates
             .AsNoTracking()
             .Include(t => t.Versions)
-            .FirstOrDefaultAsync(
-                t => t.Nit == nit
-                     && t.DocumentType == docType
-                     && t.Status == "published",
-                cancellationToken);
+            .Where(t => t.Nit == nit
+                        && t.DocumentType == docType
+                        && t.Status == "published")
+            .OrderByDescending(t => t.UpdatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (template is null)
             return null;

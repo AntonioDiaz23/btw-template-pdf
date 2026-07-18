@@ -95,6 +95,36 @@ public sealed class TemplateCatalogService
             .First();
 
         var now = DateTimeOffset.UtcNow;
+        if (request.SectorSalud is bool sector)
+            template.SectorSalud = sector;
+        if (!string.IsNullOrWhiteSpace(request.Nit))
+            template.Nit = request.Nit.Trim();
+
+        // After a publish, the next save opens a new draft version (v+1)
+        // so republishing can bump CurrentVersionNumber.
+        if (current.IsPublished || template.Status == "published")
+        {
+            var draft = new TemplateVersionEntity
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = template.Id,
+                VersionNumber = current.VersionNumber + 1,
+                Html = request.Html,
+                Css = request.Css,
+                SchemaJson = request.SchemaJson,
+                SampleDataJson = request.SampleDataJson,
+                BlocksJson = request.BlocksJson,
+                PageJson = request.PageJson ?? current.PageJson,
+                CreatedAt = now,
+                IsPublished = false
+            };
+            template.Versions.Add(draft);
+            template.Status = "draft";
+            template.UpdatedAt = now;
+            await _db.SaveChangesAsync(ct);
+            return MapVersion(draft);
+        }
+
         current.Html = request.Html;
         current.Css = request.Css;
         current.SchemaJson = request.SchemaJson;
@@ -107,10 +137,6 @@ public sealed class TemplateCatalogService
 
         template.Status = "draft";
         template.UpdatedAt = now;
-        if (request.SectorSalud is bool sector)
-            template.SectorSalud = sector;
-        if (!string.IsNullOrWhiteSpace(request.Nit))
-            template.Nit = request.Nit.Trim();
 
         await _db.SaveChangesAsync(ct);
         return MapVersion(current);
@@ -129,6 +155,8 @@ public sealed class TemplateCatalogService
 
         var now = DateTimeOffset.UtcNow;
 
+        // Publishing an already-published tip with no edits still clones to v+1
+        // (keeps an explicit release history).
         if (current.IsPublished)
         {
             var next = new TemplateVersionEntity
