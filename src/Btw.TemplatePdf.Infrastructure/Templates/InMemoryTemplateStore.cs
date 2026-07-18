@@ -26,6 +26,16 @@ public sealed class InMemoryTemplateStore : ITemplateStore
         return Task.FromResult<TemplateDefinition?>(template);
     }
 
+    public Task<TemplateDefinition?> GetByVersionAsync(
+        Guid templateId,
+        int versionNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var match = _store.Values.FirstOrDefault(t =>
+            t.TemplateId == templateId && t.Version == versionNumber);
+        return Task.FromResult(match);
+    }
+
     private static TemplateDefinition CreateDemoTemplate(string nit, DocumentType type)
     {
         var blocks = new[]

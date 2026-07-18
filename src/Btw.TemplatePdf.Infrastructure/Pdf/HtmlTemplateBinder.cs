@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Btw.TemplatePdf.Domain.Invoices;
+using QRCoder;
 
 namespace Btw.TemplatePdf.Infrastructure.Pdf;
 
@@ -68,7 +69,7 @@ public static class HtmlTemplateBinder
             try
             {
                 var decoded = Uri.UnescapeDataString(match.Groups[1].Value);
-                return QrImageUrl(decoded);
+                return QrDataUrl(decoded);
             }
             catch
             {
@@ -145,7 +146,7 @@ public static class HtmlTemplateBinder
         }
 
         if (filter == "qr")
-            return QrImageUrl(value.ToString());
+            return QrDataUrl(value.ToString());
 
         return value.ValueKind switch
         {
@@ -159,9 +160,20 @@ public static class HtmlTemplateBinder
         };
     }
 
-    private static string QrImageUrl(string payload) =>
-        "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" +
-        Uri.EscapeDataString(payload);
+    /// <summary>
+    /// Embed QR as data-URL PNG (no external api.qrserver.com — Playwright often cannot load it).
+    /// </summary>
+    private static string QrDataUrl(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload))
+            return string.Empty;
+
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(payload.Trim(), QRCodeGenerator.ECCLevel.Q);
+        var png = new PngByteQRCode(data);
+        var bytes = png.GetGraphic(pixelsPerModule: 8);
+        return $"data:image/png;base64,{Convert.ToBase64String(bytes)}";
+    }
 
     private static string GuessMime(byte[] bytes)
     {

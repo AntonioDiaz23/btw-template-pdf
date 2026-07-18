@@ -15,6 +15,7 @@ public static class DatabaseInitializer
 
         await db.Database.EnsureCreatedAsync(ct);
         await EnsureAssetsJsonColumnAsync(db, ct);
+        await EnsureInvoiceTemplateBindingsTableAsync(db, ct);
         logger.LogInformation("PostgreSQL schema ensured for TemplatePdf.");
 
         if (await db.Templates.AnyAsync(ct))
@@ -64,6 +65,28 @@ public static class DatabaseInitializer
             """
             ALTER TABLE template_versions
             ADD COLUMN IF NOT EXISTS "AssetsJson" text NOT NULL DEFAULT '[]';
+            """,
+            ct);
+    }
+
+    private static async Task EnsureInvoiceTemplateBindingsTableAsync(TemplateDbContext db, CancellationToken ct)
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS invoice_template_bindings (
+                "Id" uuid NOT NULL,
+                "Nit" character varying(20) NOT NULL,
+                "Cufe" character varying(128) NOT NULL,
+                "DocumentType" character varying(40) NOT NULL,
+                "TemplateId" uuid NOT NULL,
+                "TemplateVersionNumber" integer NOT NULL,
+                "BoundAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_invoice_template_bindings" PRIMARY KEY ("Id")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_invoice_template_bindings_Cufe"
+                ON invoice_template_bindings ("Cufe");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_invoice_template_bindings_Nit_Cufe"
+                ON invoice_template_bindings ("Nit", "Cufe");
             """,
             ct);
     }

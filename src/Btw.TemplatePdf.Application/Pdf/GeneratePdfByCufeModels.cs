@@ -16,7 +16,9 @@ public sealed record GeneratePdfByCufeResponse(
     int TemplateVersion,
     string ContentType,
     string FileName,
-    string PdfBase64);
+    string PdfBase64,
+    /// <summary>True when this CUFE already had a pinned template version from a previous render.</summary>
+    bool ReusedPinnedTemplate = false);
 
 public sealed class PdfGenerationException : AppException
 {

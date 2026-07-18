@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddSingleton<UblDiagnosticsWriter>();
         services.AddScoped<IUblStore, FeDianUblStore>();
         services.AddScoped<ITemplateStore, PostgresTemplateStore>();
+        services.AddScoped<IInvoiceTemplateBindingStore, PostgresInvoiceTemplateBindingStore>();
         services.AddScoped<ITemplateCatalog, PostgresTemplateCatalog>();
         services.AddSingleton<IUblToViewModelMapper, DianUblToViewModelMapper>();
         services.AddSingleton<IAssetStore, EmbeddedDataUrlAssetStore>();

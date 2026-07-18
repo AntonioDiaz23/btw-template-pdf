@@ -1,16 +1,20 @@
 using Btw.TemplatePdf.Application.Common;
 using Btw.TemplatePdf.Domain.Abstractions;
 using Btw.TemplatePdf.Domain.Invoices;
+using Btw.TemplatePdf.Domain.Templates;
 using FluentValidation;
 
 namespace Btw.TemplatePdf.Application.Pdf;
 
 /// <summary>
-/// Application use case: load template + UBL (in parallel), map, render PDF.
+/// Application use case: load template + UBL, map, render PDF.
+/// First render for a CUFE pins the template version so later template edits
+/// do not change already-generated invoices (HTML/CSS/logos stay as originally used).
 /// </summary>
 public sealed class GeneratePdfByCufeUseCase
 {
     private readonly ITemplateStore _templates;
+    private readonly IInvoiceTemplateBindingStore _bindings;
     private readonly IUblStore _ublStore;
     private readonly IUblToViewModelMapper _mapper;
     private readonly IAssetStore _assets;
@@ -19,6 +23,7 @@ public sealed class GeneratePdfByCufeUseCase
 
     public GeneratePdfByCufeUseCase(
         ITemplateStore templates,
+        IInvoiceTemplateBindingStore bindings,
         IUblStore ublStore,
         IUblToViewModelMapper mapper,
         IAssetStore assets,
@@ -26,6 +31,7 @@ public sealed class GeneratePdfByCufeUseCase
         IValidator<GeneratePdfByCufeRequest> validator)
     {
         _templates = templates;
+        _bindings = bindings;
         _ublStore = ublStore;
         _mapper = mapper;
         _assets = assets;
@@ -45,16 +51,41 @@ public sealed class GeneratePdfByCufeUseCase
         if (string.IsNullOrWhiteSpace(nit))
             throw new PdfGenerationException(AppErrorCodes.ValidationError, "nit is required.");
 
-        var templateTask = _templates.GetPublishedAsync(nit, request.DocumentType, cancellationToken);
+        var bindingTask = _bindings.FindAsync(nit, cufe, cancellationToken);
         var ublTask = _ublStore.GetUblXmlAsync(nit, cufe, cancellationToken);
-        await Task.WhenAll(templateTask, ublTask).ConfigureAwait(false);
+        await Task.WhenAll(bindingTask, ublTask).ConfigureAwait(false);
 
-        var template = await templateTask.ConfigureAwait(false);
-        if (template is null)
+        var binding = await bindingTask.ConfigureAwait(false);
+        var pinned = binding is not null;
+
+        TemplateDefinition template;
+        if (binding is not null)
         {
-            throw new PdfGenerationException(
-                AppErrorCodes.TemplateNotFound,
-                $"No published {request.DocumentType} template for NIT {nit}.");
+            var pinnedTemplate = await _templates
+                .GetByVersionAsync(binding.TemplateId, binding.TemplateVersionNumber, cancellationToken)
+                .ConfigureAwait(false);
+            if (pinnedTemplate is null)
+            {
+                throw new PdfGenerationException(
+                    AppErrorCodes.TemplateNotFound,
+                    $"Pinned template {binding.TemplateId} v{binding.TemplateVersionNumber} was not found for CUFE {cufe}.");
+            }
+
+            template = pinnedTemplate;
+        }
+        else
+        {
+            var published = await _templates
+                .GetPublishedAsync(nit, request.DocumentType, cancellationToken)
+                .ConfigureAwait(false);
+            if (published is null)
+            {
+                throw new PdfGenerationException(
+                    AppErrorCodes.TemplateNotFound,
+                    $"No published {request.DocumentType} template for NIT {nit}.");
+            }
+
+            template = published;
         }
 
         var ublXml = await ublTask.ConfigureAwait(false);
@@ -94,6 +125,20 @@ public sealed class GeneratePdfByCufeUseCase
                 $"PDF render failed: {ex.Message}");
         }
 
+        if (!pinned)
+        {
+            await _bindings.SaveAsync(
+                    new InvoiceTemplateBinding(
+                        nit,
+                        cufe,
+                        request.DocumentType,
+                        template.TemplateId,
+                        template.Version,
+                        DateTimeOffset.UtcNow),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         var shortCufe = cufe.Length <= 8 ? cufe : cufe[..8];
         return new GeneratePdfByCufeResponse(
             Nit: nit,
@@ -103,7 +148,8 @@ public sealed class GeneratePdfByCufeUseCase
             TemplateVersion: template.Version,
             ContentType: "application/pdf",
             FileName: $"FE-{nit}-{shortCufe}.pdf",
-            PdfBase64: Convert.ToBase64String(pdfBytes));
+            PdfBase64: Convert.ToBase64String(pdfBytes),
+            ReusedPinnedTemplate: pinned);
     }
 
     private static string NormalizeNit(string? nit)

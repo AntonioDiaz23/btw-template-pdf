@@ -130,6 +130,7 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
                 IsPublished = false
             };
             template.Versions.Add(draft);
+            _db.TemplateVersions.Add(draft);
             template.Status = "draft";
             template.UpdatedAt = now;
             await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -189,6 +190,7 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             foreach (var version in template.Versions)
                 version.IsPublished = false;
             template.Versions.Add(next);
+            _db.TemplateVersions.Add(next);
             template.CurrentVersionNumber = next.VersionNumber;
             template.Status = "published";
             template.UpdatedAt = now;

@@ -12,6 +12,7 @@ namespace Btw.TemplatePdf.Application.Tests;
 public sealed class GeneratePdfByCufeUseCaseTests
 {
     private readonly ITemplateStore _templates = Substitute.For<ITemplateStore>();
+    private readonly IInvoiceTemplateBindingStore _bindings = Substitute.For<IInvoiceTemplateBindingStore>();
     private readonly IUblStore _ubl = Substitute.For<IUblStore>();
     private readonly IUblToViewModelMapper _mapper = Substitute.For<IUblToViewModelMapper>();
     private readonly IAssetStore _assets = Substitute.For<IAssetStore>();
@@ -19,10 +20,10 @@ public sealed class GeneratePdfByCufeUseCaseTests
     private readonly IValidator<GeneratePdfByCufeRequest> _validator = new GeneratePdfByCufeRequestValidator();
 
     private GeneratePdfByCufeUseCase CreateSut() =>
-        new(_templates, _ubl, _mapper, _assets, _renderer, _validator);
+        new(_templates, _bindings, _ubl, _mapper, _assets, _renderer, _validator);
 
     [Fact]
-    public async Task ExecuteAsync_WhenValid_ReturnsPdfBase64()
+    public async Task ExecuteAsync_WhenValid_ReturnsPdfBase64_AndPinsTemplate()
     {
         var template = new TemplateDefinition
         {
@@ -41,6 +42,8 @@ public sealed class GeneratePdfByCufeUseCaseTests
             Data = new Dictionary<string, object?>()
         };
 
+        _bindings.FindAsync("900000000", "ABCDEFGH", Arg.Any<CancellationToken>())
+            .Returns((InvoiceTemplateBinding?)null);
         _templates.GetPublishedAsync("900000000", DocumentType.Factura, Arg.Any<CancellationToken>())
             .Returns(template);
         _ubl.GetUblXmlAsync("900000000", "ABCDEFGH", Arg.Any<CancellationToken>())
@@ -57,7 +60,67 @@ public sealed class GeneratePdfByCufeUseCaseTests
         Assert.Equal("900000000", result.Nit);
         Assert.Equal(template.TemplateId, result.TemplateId);
         Assert.Equal(2, result.TemplateVersion);
+        Assert.False(result.ReusedPinnedTemplate);
         Assert.False(string.IsNullOrWhiteSpace(result.PdfBase64));
+        await _bindings.Received(1).SaveAsync(
+            Arg.Is<InvoiceTemplateBinding>(b =>
+                b.Cufe == "ABCDEFGH" &&
+                b.TemplateId == template.TemplateId &&
+                b.TemplateVersionNumber == 2),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenPinned_UsesHistoricalVersion_NotLatestPublished()
+    {
+        var pinnedId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var pinned = new TemplateDefinition
+        {
+            TemplateId = pinnedId,
+            Nit = "900000000",
+            DocumentType = DocumentType.Factura,
+            Version = 1,
+            BlocksJson = "[]",
+            Html = "<p>old</p>",
+            Css = ""
+        };
+        var invoice = new InvoiceViewModel
+        {
+            Nit = "900000000",
+            Cufe = "CUFE1",
+            Data = new Dictionary<string, object?>()
+        };
+
+        _bindings.FindAsync("900000000", "CUFE1", Arg.Any<CancellationToken>())
+            .Returns(new InvoiceTemplateBinding(
+                "900000000",
+                "CUFE1",
+                DocumentType.Factura,
+                pinnedId,
+                1,
+                DateTimeOffset.UtcNow));
+        _templates.GetByVersionAsync(pinnedId, 1, Arg.Any<CancellationToken>())
+            .Returns(pinned);
+        _ubl.GetUblXmlAsync("900000000", "CUFE1", Arg.Any<CancellationToken>())
+            .Returns("<Invoice/>");
+        _mapper.Map("900000000", "CUFE1", "<Invoice/>").Returns(invoice);
+        _assets.ResolveAsync(Arg.Any<IEnumerable<TemplateAssetRef>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<string, byte[]>());
+        _renderer.RenderAsync(pinned, invoice, Arg.Any<IReadOnlyDictionary<string, byte[]>>(), Arg.Any<CancellationToken>())
+            .Returns("%PDF-1.4"u8.ToArray());
+
+        var result = await CreateSut().ExecuteAsync(
+            new GeneratePdfByCufeRequest("900000000", "CUFE1"));
+
+        Assert.True(result.ReusedPinnedTemplate);
+        Assert.Equal(1, result.TemplateVersion);
+        await _templates.DidNotReceive().GetPublishedAsync(
+            Arg.Any<string>(),
+            Arg.Any<DocumentType>(),
+            Arg.Any<CancellationToken>());
+        await _bindings.DidNotReceive().SaveAsync(
+            Arg.Any<InvoiceTemplateBinding>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -72,6 +135,8 @@ public sealed class GeneratePdfByCufeUseCaseTests
     [Fact]
     public async Task ExecuteAsync_WhenTemplateMissing_ThrowsTemplateNotFound()
     {
+        _bindings.FindAsync("900000000", "CUFE", Arg.Any<CancellationToken>())
+            .Returns((InvoiceTemplateBinding?)null);
         _templates.GetPublishedAsync("900000000", DocumentType.Factura, Arg.Any<CancellationToken>())
             .Returns((TemplateDefinition?)null);
         _ubl.GetUblXmlAsync("900000000", "CUFE", Arg.Any<CancellationToken>())
@@ -86,6 +151,8 @@ public sealed class GeneratePdfByCufeUseCaseTests
     [Fact]
     public async Task ExecuteAsync_WhenUblMissing_ThrowsInvoiceNotFound()
     {
+        _bindings.FindAsync("900000000", "CUFE", Arg.Any<CancellationToken>())
+            .Returns((InvoiceTemplateBinding?)null);
         _templates.GetPublishedAsync("900000000", DocumentType.Factura, Arg.Any<CancellationToken>())
             .Returns(new TemplateDefinition
             {
@@ -106,6 +173,8 @@ public sealed class GeneratePdfByCufeUseCaseTests
     [Fact]
     public async Task ExecuteAsync_WhenMapperFails_ThrowsMappingError()
     {
+        _bindings.FindAsync("900000000", "CUFE", Arg.Any<CancellationToken>())
+            .Returns((InvoiceTemplateBinding?)null);
         _templates.GetPublishedAsync("900000000", DocumentType.Factura, Arg.Any<CancellationToken>())
             .Returns(new TemplateDefinition
             {

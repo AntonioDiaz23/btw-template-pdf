@@ -32,3 +32,17 @@ public sealed class TemplateVersionEntity
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsPublished { get; set; }
 }
+
+/// <summary>
+/// Pins the first PDF render of a CUFE to a concrete template version.
+/// </summary>
+public sealed class InvoiceTemplateBindingEntity
+{
+    public Guid Id { get; set; }
+    public string Nit { get; set; } = string.Empty;
+    public string Cufe { get; set; } = string.Empty;
+    public string DocumentType { get; set; } = "factura";
+    public Guid TemplateId { get; set; }
+    public int TemplateVersionNumber { get; set; }
+    public DateTimeOffset BoundAt { get; set; }
+}

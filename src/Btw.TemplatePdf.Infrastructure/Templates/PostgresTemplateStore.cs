@@ -47,6 +47,23 @@ public sealed class PostgresTemplateStore : ITemplateStore
         return MapDefinition(template, version);
     }
 
+    public async Task<TemplateDefinition?> GetByVersionAsync(
+        Guid templateId,
+        int versionNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var template = await _db.Templates
+            .AsNoTracking()
+            .Include(t => t.Versions)
+            .FirstOrDefaultAsync(t => t.Id == templateId, cancellationToken);
+
+        if (template is null)
+            return null;
+
+        var version = template.Versions.FirstOrDefault(v => v.VersionNumber == versionNumber);
+        return version is null ? null : MapDefinition(template, version);
+    }
+
     internal static TemplateDefinition MapDefinition(TemplateEntity template, TemplateVersionEntity version)
     {
         PageSettings page;
