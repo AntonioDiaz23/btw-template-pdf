@@ -28,7 +28,7 @@ public sealed record TemplateBundleDto(TemplateDto Template, IReadOnlyList<Templ
 public sealed record CreateTemplateRequest(
     string Name,
     string DocumentType,
-    string? Nit = null,
+    string Nit,
     bool SectorSalud = false,
     string? Html = null,
     string? Css = null,
@@ -38,12 +38,17 @@ public sealed record CreateTemplateRequest(
     string? PageJson = null,
     string? AssetsJson = null);
 
+/// <summary>
+/// Upsert draft content, or publish current tip when <see cref="Status"/> is <c>published</c>.
+/// When publishing, content fields are optional (republish existing tip).
+/// </summary>
 public sealed record SaveDraftRequest(
-    string Html,
-    string Css,
-    string SchemaJson,
-    string SampleDataJson,
-    string BlocksJson,
+    string? Status = "draft",
+    string? Html = null,
+    string? Css = null,
+    string? SchemaJson = null,
+    string? SampleDataJson = null,
+    string? BlocksJson = null,
     string? PageJson = null,
     string? Nit = null,
     bool? SectorSalud = null,

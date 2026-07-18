@@ -57,7 +57,7 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             DocumentType = string.IsNullOrWhiteSpace(request.DocumentType) ? "factura" : request.DocumentType,
             Status = "draft",
             CurrentVersionNumber = 1,
-            Nit = string.IsNullOrWhiteSpace(request.Nit) ? "900000000" : request.Nit.Trim(),
+            Nit = request.Nit.Trim(),
             SectorSalud = request.SectorSalud,
             UpdatedAt = now,
             Versions =
@@ -106,6 +106,12 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
         if (!string.IsNullOrWhiteSpace(request.Nit))
             template.Nit = request.Nit.Trim();
 
+        var html = request.Html ?? current.Html;
+        var css = request.Css ?? current.Css;
+        var schemaJson = request.SchemaJson ?? current.SchemaJson;
+        var sampleDataJson = request.SampleDataJson ?? current.SampleDataJson;
+        var blocksJson = request.BlocksJson ?? current.BlocksJson;
+
         if (current.IsPublished || template.Status == "published")
         {
             var draft = new TemplateVersionEntity
@@ -113,11 +119,11 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
                 Id = Guid.NewGuid(),
                 TemplateId = template.Id,
                 VersionNumber = current.VersionNumber + 1,
-                Html = request.Html,
-                Css = request.Css,
-                SchemaJson = request.SchemaJson,
-                SampleDataJson = request.SampleDataJson,
-                BlocksJson = request.BlocksJson,
+                Html = html,
+                Css = css,
+                SchemaJson = schemaJson,
+                SampleDataJson = sampleDataJson,
+                BlocksJson = blocksJson,
                 PageJson = request.PageJson ?? current.PageJson,
                 AssetsJson = request.AssetsJson ?? current.AssetsJson,
                 CreatedAt = now,
@@ -130,11 +136,11 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             return MapVersion(draft);
         }
 
-        current.Html = request.Html;
-        current.Css = request.Css;
-        current.SchemaJson = request.SchemaJson;
-        current.SampleDataJson = request.SampleDataJson;
-        current.BlocksJson = request.BlocksJson;
+        current.Html = html;
+        current.Css = css;
+        current.SchemaJson = schemaJson;
+        current.SampleDataJson = sampleDataJson;
+        current.BlocksJson = blocksJson;
         if (request.PageJson is not null)
             current.PageJson = request.PageJson;
         if (request.AssetsJson is not null)

@@ -18,7 +18,6 @@ public static class DependencyInjection
         services.AddScoped<GetTemplateUseCase>();
         services.AddScoped<CreateTemplateUseCase>();
         services.AddScoped<SaveDraftUseCase>();
-        services.AddScoped<PublishTemplateUseCase>();
 
         return services;
     }

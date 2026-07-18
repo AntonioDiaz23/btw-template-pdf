@@ -3,6 +3,7 @@ using Btw.TemplatePdf.Api.Middleware;
 using Btw.TemplatePdf.Infrastructure;
 using Btw.TemplatePdf.Infrastructure.Auth;
 using Btw.TemplatePdf.Infrastructure.Persistence;
+using Microsoft.OpenApi;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -14,7 +15,34 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
     });
-builder.Services.AddOpenApi();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "BTW Template PDF API",
+        Version = "v1",
+        Description =
+            "Template catalog + PDF-by-CUFE. Send the studio FE JWT as Authorization: Bearer {token}."
+    });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Description = "FE JWT from studio login. Example: Bearer eyJhbGciOi...",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
+});
+
 builder.Services.AddTemplatePdfApplication();
 builder.Services.AddTemplatePdfInfrastructure(builder.Configuration);
 
@@ -59,9 +87,18 @@ var app = builder.Build();
 
 await DatabaseInitializer.InitializeAsync(app.Services);
 
-if (app.Environment.IsDevelopment())
+var swaggerEnabled = app.Environment.IsDevelopment()
+    || app.Configuration.GetValue("Swagger:Enabled", false);
+
+if (swaggerEnabled)
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "BTW Template PDF v1");
+        options.DocumentTitle = "BTW Template PDF API";
+        options.DisplayRequestDuration();
+    });
 }
 
 app.UseMiddleware<AppExceptionMiddleware>();

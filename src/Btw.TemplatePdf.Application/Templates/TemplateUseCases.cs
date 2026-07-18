@@ -71,8 +71,15 @@ public sealed class SaveDraftUseCase
         CancellationToken cancellationToken = default)
     {
         await _validator.ValidateAndThrowAppAsync(request, cancellationToken).ConfigureAwait(false);
+
+        var status = NormalizeStatus(request.Status);
         try
         {
+            if (status == "published")
+            {
+                return await _catalog.PublishAsync(id, cancellationToken).ConfigureAwait(false);
+            }
+
             return await _catalog.SaveDraftAsync(id, request, cancellationToken).ConfigureAwait(false);
         }
         catch (KeyNotFoundException)
@@ -82,25 +89,14 @@ public sealed class SaveDraftUseCase
                 $"Template '{id}' was not found.");
         }
     }
-}
 
-public sealed class PublishTemplateUseCase
-{
-    private readonly ITemplateCatalog _catalog;
-
-    public PublishTemplateUseCase(ITemplateCatalog catalog) => _catalog = catalog;
-
-    public async Task<TemplateVersionDto> ExecuteAsync(Guid id, CancellationToken cancellationToken = default)
+    internal static string NormalizeStatus(string? status)
     {
-        try
-        {
-            return await _catalog.PublishAsync(id, cancellationToken).ConfigureAwait(false);
-        }
-        catch (KeyNotFoundException)
-        {
-            throw new AppException(
-                AppErrorCodes.TemplateNotFound,
-                $"Template '{id}' was not found.");
-        }
+        var value = string.IsNullOrWhiteSpace(status) ? "draft" : status.Trim().ToLowerInvariant();
+        return value is "draft" or "published"
+            ? value
+            : throw new AppException(
+                AppErrorCodes.ValidationError,
+                "status must be 'draft' or 'published'.");
     }
 }

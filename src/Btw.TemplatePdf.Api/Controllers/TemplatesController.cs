@@ -11,20 +11,17 @@ public sealed class TemplatesController : ControllerBase
     private readonly GetTemplateUseCase _get;
     private readonly CreateTemplateUseCase _create;
     private readonly SaveDraftUseCase _saveDraft;
-    private readonly PublishTemplateUseCase _publish;
 
     public TemplatesController(
         ListTemplatesUseCase list,
         GetTemplateUseCase get,
         CreateTemplateUseCase create,
-        SaveDraftUseCase saveDraft,
-        PublishTemplateUseCase publish)
+        SaveDraftUseCase saveDraft)
     {
         _list = list;
         _get = get;
         _create = create;
         _saveDraft = saveDraft;
-        _publish = publish;
     }
 
     [HttpGet]
@@ -48,6 +45,10 @@ public sealed class TemplatesController : ControllerBase
         return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
+    /// <summary>
+    /// Save draft content, or publish when body.status is <c>published</c>
+    /// (content fields optional on publish — republishes the current tip).
+    /// </summary>
     [HttpPut("{id:guid}/draft")]
     public async Task<ActionResult<TemplateVersionDto>> SaveDraft(
         Guid id,
@@ -55,11 +56,5 @@ public sealed class TemplatesController : ControllerBase
         CancellationToken ct)
     {
         return Ok(await _saveDraft.ExecuteAsync(id, request, ct));
-    }
-
-    [HttpPost("{id:guid}/publish")]
-    public async Task<ActionResult<TemplateVersionDto>> Publish(Guid id, CancellationToken ct)
-    {
-        return Ok(await _publish.ExecuteAsync(id, ct));
     }
 }

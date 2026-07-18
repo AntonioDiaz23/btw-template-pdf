@@ -57,6 +57,13 @@ dotnet run --project src/Btw.TemplatePdf.Api --launch-profile http
 
 API listens on `http://localhost:5299`.
 
+Swagger UI (Development, or `Swagger:Enabled=true`):
+
+- Local: http://localhost:5299/swagger
+- Docker: http://localhost:8080/swagger
+
+Use **Authorize** with the studio FE JWT (`Bearer <token>`).
+
 ### Templates (studio)
 
 | Method | Path |
@@ -65,7 +72,8 @@ API listens on `http://localhost:5299`.
 | GET | `/api/v1/templates/{id}` |
 | POST | `/api/v1/templates` |
 | PUT | `/api/v1/templates/{id}/draft` |
-| POST | `/api/v1/templates/{id}/publish` |
+
+`PUT .../draft` with `status: "draft"` saves content; with `status: "published"` republishes the current tip (content fields optional). Create requires `name`, `documentType`, and `nit`.
 
 ### UBL by CUFE (GetDocumentFromDian)
 

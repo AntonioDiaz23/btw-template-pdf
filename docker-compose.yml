@@ -11,7 +11,8 @@ services:
     ports:
       - "${POSTGRES_PORT:-5433}:5432"
     volumes:
-      - btw_template_pdf_pg:/var/lib/postgresql/data
+      # Postgres 18+ expects the mount at /var/lib/postgresql (not .../data)
+      - btw_template_pdf_pg:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-btw} -d ${POSTGRES_DB:-btw_template_pdf}"]
       interval: 5s
@@ -39,6 +40,7 @@ services:
       FeDian__AuthKey: ${FEDIAN_AUTH_KEY:-}
       FeDian__AllowStubFallback: ${FEDIAN_ALLOW_STUB_FALLBACK:-true}
       FeDian__TimeoutSeconds: ${FEDIAN_TIMEOUT_SECONDS:-60}
+      Swagger__Enabled: ${SWAGGER_ENABLED:-true}
     ports:
       - "${API_PORT:-8080}:8080"
 

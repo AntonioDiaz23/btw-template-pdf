@@ -36,6 +36,8 @@ public sealed class CreateTemplateRequestValidator : AbstractValidator<CreateTem
     public CreateTemplateRequestValidator()
     {
         RuleFor(x => x.Name).NotEmpty().WithMessage("Name is required.");
+        RuleFor(x => x.DocumentType).NotEmpty().WithMessage("documentType is required.");
+        RuleFor(x => x.Nit).NotEmpty().WithMessage("nit is required.");
     }
 }
 
@@ -43,12 +45,25 @@ public sealed class SaveDraftRequestValidator : AbstractValidator<SaveDraftReque
 {
     public SaveDraftRequestValidator()
     {
-        RuleFor(x => x.Html).NotNull().WithMessage("Html is required.");
-        RuleFor(x => x.Css).NotNull().WithMessage("Css is required.");
-        RuleFor(x => x.SchemaJson).NotNull().WithMessage("SchemaJson is required.");
-        RuleFor(x => x.SampleDataJson).NotNull().WithMessage("SampleDataJson is required.");
-        RuleFor(x => x.BlocksJson).NotNull().WithMessage("BlocksJson is required.");
+        RuleFor(x => x.Status)
+            .Must(s => string.IsNullOrWhiteSpace(s)
+                || s.Trim().Equals("draft", StringComparison.OrdinalIgnoreCase)
+                || s.Trim().Equals("published", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("status must be 'draft' or 'published'.");
+
+        When(x => IsDraft(x.Status), () =>
+        {
+            RuleFor(x => x.Html).NotNull().WithMessage("Html is required.");
+            RuleFor(x => x.Css).NotNull().WithMessage("Css is required.");
+            RuleFor(x => x.SchemaJson).NotNull().WithMessage("SchemaJson is required.");
+            RuleFor(x => x.SampleDataJson).NotNull().WithMessage("SampleDataJson is required.");
+            RuleFor(x => x.BlocksJson).NotNull().WithMessage("BlocksJson is required.");
+        });
     }
+
+    private static bool IsDraft(string? status) =>
+        string.IsNullOrWhiteSpace(status)
+        || status.Trim().Equals("draft", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class GetUblByCufeRequestValidator : AbstractValidator<GetUblByCufeRequest>
