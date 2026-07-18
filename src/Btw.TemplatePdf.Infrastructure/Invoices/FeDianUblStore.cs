@@ -12,17 +12,20 @@ public sealed class FeDianUblStore : IUblStore
     private readonly FeDianDocumentClient _client;
     private readonly InMemoryUblStore _stub;
     private readonly FeDianOptions _options;
+    private readonly UblDiagnosticsWriter _diagnostics;
     private readonly ILogger<FeDianUblStore> _logger;
 
     public FeDianUblStore(
         FeDianDocumentClient client,
         InMemoryUblStore stub,
         IOptions<FeDianOptions> options,
+        UblDiagnosticsWriter diagnostics,
         ILogger<FeDianUblStore> logger)
     {
         _client = client;
         _stub = stub;
         _options = options.Value;
+        _diagnostics = diagnostics;
         _logger = logger;
     }
 
@@ -31,6 +34,8 @@ public sealed class FeDianUblStore : IUblStore
         string cufe,
         CancellationToken cancellationToken = default)
     {
+        UblDiagnosticsAmbient.CurrentReportPath = null;
+
         if (_client.IsConfigured)
         {
             try
@@ -47,6 +52,8 @@ public sealed class FeDianUblStore : IUblStore
                     .ConfigureAwait(false);
                 if (!string.IsNullOrWhiteSpace(ubl))
                 {
+                    var path = _diagnostics.WriteFetchReport(nit, cufe, ubl, source: "GetDocumentFromDian");
+                    UblDiagnosticsAmbient.CurrentReportPath = path;
                     UblMappingDiagnostics.LogFetchedUbl(_logger, nit, cufe, ubl, source: "GetDocumentFromDian");
                     return ubl;
                 }
@@ -81,6 +88,8 @@ public sealed class FeDianUblStore : IUblStore
                 "Using STUB UBL fallback for nit={Nit} cufe={Cufe} — mapped fields will be demo data, not DIAN.",
                 nit,
                 cufe);
+            var path = _diagnostics.WriteFetchReport(nit, cufe, stub, source: "StubFallback");
+            UblDiagnosticsAmbient.CurrentReportPath = path;
             UblMappingDiagnostics.LogFetchedUbl(_logger, nit, cufe, stub, source: "StubFallback");
         }
 
