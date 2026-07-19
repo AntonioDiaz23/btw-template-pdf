@@ -10,6 +10,12 @@ using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Multipart brand uploads — keep an explicit ceiling so reverse proxies can align.
+    options.Limits.MaxRequestBodySize = 20 * 1024 * 1024;
+});
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

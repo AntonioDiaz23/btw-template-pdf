@@ -1,4 +1,5 @@
 using Btw.TemplatePdf.Application.Templates;
+using Btw.TemplatePdf.Infrastructure.Assets;
 using Btw.TemplatePdf.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -73,7 +74,12 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
                     SampleDataJson = request.SampleDataJson ?? "{}",
                     BlocksJson = request.BlocksJson ?? "[]",
                     PageJson = request.PageJson ?? "{}",
-                    AssetsJson = request.AssetsJson ?? "[]",
+                    AssetsJson = await BrandAssetHydrator.HydrateAssetsJsonAsync(
+                            _db,
+                            request.AssetsJson,
+                            "[]",
+                            cancellationToken)
+                        .ConfigureAwait(false),
                     CreatedAt = now,
                     IsPublished = false
                 }
@@ -111,6 +117,12 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
         var schemaJson = request.SchemaJson ?? current.SchemaJson;
         var sampleDataJson = request.SampleDataJson ?? current.SampleDataJson;
         var blocksJson = request.BlocksJson ?? current.BlocksJson;
+        var assetsJson = await BrandAssetHydrator.HydrateAssetsJsonAsync(
+                _db,
+                request.AssetsJson,
+                current.AssetsJson,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         if (current.IsPublished || template.Status == "published")
         {
@@ -125,7 +137,7 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
                 SampleDataJson = sampleDataJson,
                 BlocksJson = blocksJson,
                 PageJson = request.PageJson ?? current.PageJson,
-                AssetsJson = request.AssetsJson ?? current.AssetsJson,
+                AssetsJson = assetsJson,
                 CreatedAt = now,
                 IsPublished = false
             };
@@ -144,8 +156,7 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
         current.BlocksJson = blocksJson;
         if (request.PageJson is not null)
             current.PageJson = request.PageJson;
-        if (request.AssetsJson is not null)
-            current.AssetsJson = request.AssetsJson;
+        current.AssetsJson = assetsJson;
         current.CreatedAt = now;
         current.IsPublished = false;
 
@@ -232,5 +243,5 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             v.BlocksJson,
             v.CreatedAt,
             v.IsPublished,
-            v.AssetsJson);
+            BrandAssetHydrator.StripDataUrls(v.AssetsJson));
 }

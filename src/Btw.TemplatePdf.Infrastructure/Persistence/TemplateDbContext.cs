@@ -12,6 +12,7 @@ public sealed class TemplateDbContext : DbContext
     public DbSet<TemplateEntity> Templates => Set<TemplateEntity>();
     public DbSet<TemplateVersionEntity> TemplateVersions => Set<TemplateVersionEntity>();
     public DbSet<InvoiceTemplateBindingEntity> InvoiceTemplateBindings => Set<InvoiceTemplateBindingEntity>();
+    public DbSet<BrandAssetEntity> BrandAssets => Set<BrandAssetEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -56,6 +57,18 @@ public sealed class TemplateDbContext : DbContext
             entity.Property(x => x.DocumentType).HasMaxLength(40).IsRequired();
             entity.HasIndex(x => x.Cufe).IsUnique();
             entity.HasIndex(x => new { x.Nit, x.Cufe }).IsUnique();
+        });
+
+        modelBuilder.Entity<BrandAssetEntity>(entity =>
+        {
+            entity.ToTable("brand_assets");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.Nit).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(260).IsRequired();
+            entity.Property(x => x.Mime).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.Bytes).HasColumnType("bytea").IsRequired();
+            entity.HasIndex(x => x.Nit);
         });
     }
 }

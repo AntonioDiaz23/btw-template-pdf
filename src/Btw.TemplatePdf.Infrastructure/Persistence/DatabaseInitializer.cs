@@ -16,6 +16,7 @@ public static class DatabaseInitializer
         await db.Database.EnsureCreatedAsync(ct);
         await EnsureAssetsJsonColumnAsync(db, ct);
         await EnsureInvoiceTemplateBindingsTableAsync(db, ct);
+        await EnsureBrandAssetsTableAsync(db, ct);
         logger.LogInformation("PostgreSQL schema ensured for TemplatePdf.");
 
         if (await db.Templates.AnyAsync(ct))
@@ -87,6 +88,24 @@ public static class DatabaseInitializer
                 ON invoice_template_bindings ("Cufe");
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_invoice_template_bindings_Nit_Cufe"
                 ON invoice_template_bindings ("Nit", "Cufe");
+            """,
+            ct);
+    }
+
+    private static async Task EnsureBrandAssetsTableAsync(TemplateDbContext db, CancellationToken ct)
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS brand_assets (
+                "Id" uuid NOT NULL,
+                "Nit" character varying(20) NOT NULL,
+                "Name" character varying(260) NOT NULL,
+                "Mime" character varying(120) NOT NULL,
+                "Bytes" bytea NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_brand_assets" PRIMARY KEY ("Id")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_brand_assets_Nit" ON brand_assets ("Nit");
             """,
             ct);
     }

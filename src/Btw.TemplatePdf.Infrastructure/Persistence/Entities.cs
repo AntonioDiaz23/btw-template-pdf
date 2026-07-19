@@ -46,3 +46,14 @@ public sealed class InvoiceTemplateBindingEntity
     public int TemplateVersionNumber { get; set; }
     public DateTimeOffset BoundAt { get; set; }
 }
+
+/// <summary>Company branding library images (uploaded once; referenced by templates).</summary>
+public sealed class BrandAssetEntity
+{
+    public Guid Id { get; set; }
+    public string Nit { get; set; } = "900000000";
+    public string Name { get; set; } = string.Empty;
+    public string Mime { get; set; } = "image/png";
+    public byte[] Bytes { get; set; } = Array.Empty<byte>();
+    public DateTimeOffset CreatedAt { get; set; }
+}
