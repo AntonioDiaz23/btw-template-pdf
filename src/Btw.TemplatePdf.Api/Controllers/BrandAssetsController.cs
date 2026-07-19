@@ -70,14 +70,22 @@ public sealed class BrandAssetsController : ControllerBase
         return File(asset.Bytes, asset.Mime, asset.Name);
     }
 
+    public sealed class UploadBrandAssetForm
+    {
+        public IFormFile File { get; set; } = null!;
+        public string? Nit { get; set; }
+    }
+
     [HttpPost]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxBytes + 64_000)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxBytes + 64_000)]
     public async Task<ActionResult<BrandAssetDto>> Upload(
-        [FromForm] IFormFile file,
-        [FromForm] string? nit = null,
+        [FromForm] UploadBrandAssetForm form,
         CancellationToken ct = default)
     {
+        var file = form.File;
+        var nit = form.Nit;
         if (file is null || file.Length == 0)
         {
             throw new AppException(AppErrorCodes.ValidationError, "file is required.");
