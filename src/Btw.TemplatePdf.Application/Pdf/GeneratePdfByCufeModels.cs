@@ -11,7 +11,7 @@ public sealed record GeneratePdfByCufeRequest(
     Guid? TemplateId = null,
     /// <summary>
     /// When true and a binding already exists, replace the pin with the rendered template.
-    /// Ignored on first render (always pins) and when reusing the pinned template.
+    /// Requires <see cref="TemplateId"/>. Ignored on first render (always pins).
     /// </summary>
     bool ReplaceBinding = false);
 

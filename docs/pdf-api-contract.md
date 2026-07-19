@@ -17,6 +17,9 @@ Optional fields:
 - `templateId` — render with that template's **published** version (instead of the pin / default).
 - `replaceBinding` — when the CUFE already has a pin and `templateId` is set, overwrite the pin (`true`) or leave it (`false`, default).
 
+Validation:
+- `replaceBinding: true` **requires** a non-empty `templateId`. Otherwise the API returns **400** `validation_error` (it does **not** silently reuse the pin).
+
 ### Response 200
 ```json
 {
@@ -34,6 +37,14 @@ Optional fields:
 ```
 
 Demo NIT seeded in memory: `900000000`.
+
+### Error responses (relevant)
+
+| HTTP | `code` | When |
+|---|---|---|
+| `400` | `validation_error` | Missing nit/cufe, or `replaceBinding` without `templateId` |
+| `404` | `template_not_found` | No published template (by NIT/type or by `templateId`) |
+| `404` | `invoice_not_found` | No UBL for nit + cufe |
 
 ## GET /api/v1/pdf/bindings/by-cufe
 

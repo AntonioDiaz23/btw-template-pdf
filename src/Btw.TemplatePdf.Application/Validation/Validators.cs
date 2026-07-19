@@ -28,6 +28,13 @@ public sealed class GeneratePdfByCufeRequestValidator : AbstractValidator<Genera
     {
         RuleFor(x => x.Nit).NotEmpty().WithMessage("nit is required.");
         RuleFor(x => x.Cufe).NotEmpty().WithMessage("cufe is required.");
+
+        When(x => x.ReplaceBinding, () =>
+        {
+            RuleFor(x => x.TemplateId)
+                .Must(id => id is { } g && g != Guid.Empty)
+                .WithMessage("templateId is required when replaceBinding is true.");
+        });
     }
 }
 

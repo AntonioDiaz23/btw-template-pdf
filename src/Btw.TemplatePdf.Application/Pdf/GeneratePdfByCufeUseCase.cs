@@ -3,6 +3,7 @@ using Btw.TemplatePdf.Domain.Abstractions;
 using Btw.TemplatePdf.Domain.Invoices;
 using Btw.TemplatePdf.Domain.Templates;
 using FluentValidation;
+using Microsoft.Extensions.Logging;
 
 namespace Btw.TemplatePdf.Application.Pdf;
 
@@ -22,6 +23,7 @@ public sealed class GeneratePdfByCufeUseCase
     private readonly IAssetStore _assets;
     private readonly IPdfRenderer _renderer;
     private readonly IValidator<GeneratePdfByCufeRequest> _validator;
+    private readonly ILogger<GeneratePdfByCufeUseCase> _logger;
 
     public GeneratePdfByCufeUseCase(
         ITemplateStore templates,
@@ -30,7 +32,8 @@ public sealed class GeneratePdfByCufeUseCase
         IUblToViewModelMapper mapper,
         IAssetStore assets,
         IPdfRenderer renderer,
-        IValidator<GeneratePdfByCufeRequest> validator)
+        IValidator<GeneratePdfByCufeRequest> validator,
+        ILogger<GeneratePdfByCufeUseCase> logger)
     {
         _templates = templates;
         _bindings = bindings;
@@ -39,6 +42,7 @@ public sealed class GeneratePdfByCufeUseCase
         _assets = assets;
         _renderer = renderer;
         _validator = validator;
+        _logger = logger;
     }
 
     public async Task<GeneratePdfByCufeResponse> ExecuteAsync(
@@ -59,7 +63,7 @@ public sealed class GeneratePdfByCufeUseCase
 
         var binding = await bindingTask.ConfigureAwait(false);
         var hasPin = binding is not null;
-        var overrideTemplate = request.TemplateId.HasValue;
+        var overrideTemplate = request.TemplateId is { } tid && tid != Guid.Empty;
 
         TemplateDefinition template;
         var reusedPinned = false;
@@ -173,6 +177,15 @@ public sealed class GeneratePdfByCufeUseCase
                 .ConfigureAwait(false);
             bindingReplaced = true;
         }
+
+        _logger.LogInformation(
+            "PDF by CUFE resolved. Nit={Nit} Cufe={Cufe} TemplateId={TemplateId} TemplateVersion={TemplateVersion} ReusedPinnedTemplate={ReusedPinned} BindingReplaced={BindingReplaced}",
+            nit,
+            cufe,
+            template.TemplateId,
+            template.Version,
+            reusedPinned,
+            bindingReplaced);
 
         var shortCufe = cufe.Length <= 8 ? cufe : cufe[..8];
         return new GeneratePdfByCufeResponse(

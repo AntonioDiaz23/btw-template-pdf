@@ -5,6 +5,7 @@ using Btw.TemplatePdf.Domain.Common;
 using Btw.TemplatePdf.Domain.Invoices;
 using Btw.TemplatePdf.Domain.Templates;
 using FluentValidation;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Btw.TemplatePdf.Application.Tests;
@@ -20,7 +21,15 @@ public sealed class GeneratePdfByCufeUseCaseTests
     private readonly IValidator<GeneratePdfByCufeRequest> _validator = new GeneratePdfByCufeRequestValidator();
 
     private GeneratePdfByCufeUseCase CreateSut() =>
-        new(_templates, _bindings, _ubl, _mapper, _assets, _renderer, _validator);
+        new(
+            _templates,
+            _bindings,
+            _ubl,
+            _mapper,
+            _assets,
+            _renderer,
+            _validator,
+            NullLogger<GeneratePdfByCufeUseCase>.Instance);
 
     [Fact]
     public async Task ExecuteAsync_WhenValid_ReturnsPdfBase64_AndPinsTemplate()
@@ -130,6 +139,40 @@ public sealed class GeneratePdfByCufeUseCaseTests
             CreateSut().ExecuteAsync(new GeneratePdfByCufeRequest("900000000", "")));
 
         Assert.Equal(AppErrorCodes.ValidationError, ex.Code);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenReplaceBindingWithoutTemplateId_ThrowsValidationError()
+    {
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            CreateSut().ExecuteAsync(
+                new GeneratePdfByCufeRequest("900000000", "CUFE1", ReplaceBinding: true)));
+
+        Assert.Equal(AppErrorCodes.ValidationError, ex.Code);
+        Assert.Contains("templateId", ex.Message, StringComparison.OrdinalIgnoreCase);
+        await _bindings.DidNotReceive().FindAsync(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await _templates.DidNotReceive().GetByVersionAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenReplaceBindingWithEmptyTemplateId_ThrowsValidationError()
+    {
+        var ex = await Assert.ThrowsAsync<AppException>(() =>
+            CreateSut().ExecuteAsync(
+                new GeneratePdfByCufeRequest(
+                    "900000000",
+                    "CUFE1",
+                    TemplateId: Guid.Empty,
+                    ReplaceBinding: true)));
+
+        Assert.Equal(AppErrorCodes.ValidationError, ex.Code);
+        Assert.Contains("templateId", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -249,7 +292,7 @@ public sealed class GeneratePdfByCufeUseCaseTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenOverrideWithReplace_UpdatesBinding()
+    public async Task ExecuteAsync_WhenOverrideWithReplace_UpdatesBinding_AndUsesPublishedVersion()
     {
         var pinnedId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var otherId = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -292,6 +335,14 @@ public sealed class GeneratePdfByCufeUseCaseTests
             new GeneratePdfByCufeRequest("900000000", "CUFE1", TemplateId: otherId, ReplaceBinding: true));
 
         Assert.True(result.BindingReplaced);
+        Assert.False(result.ReusedPinnedTemplate);
+        Assert.Equal(otherId, result.TemplateId);
+        Assert.Equal(3, result.TemplateVersion);
+        await _templates.Received(1).GetPublishedByIdAsync(otherId, Arg.Any<CancellationToken>());
+        await _templates.DidNotReceive().GetByVersionAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>());
         await _bindings.Received(1).ReplaceAsync(
             Arg.Is<InvoiceTemplateBinding>(b =>
                 b.TemplateId == otherId && b.TemplateVersionNumber == 3),

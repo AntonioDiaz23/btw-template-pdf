@@ -29,7 +29,7 @@ public sealed class PostgresTemplateStore : ITemplateStore
             .Include(t => t.Versions)
             .Where(t => t.Nit == nit
                         && t.DocumentType == docType
-                        && t.Versions.Any(v => v.IsPublished))
+                        && t.Versions.Any(v => VersionStatuses.IsPublished(v.Status) || v.IsPublished))
             .OrderByDescending(t => t.UpdatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -37,7 +37,7 @@ public sealed class PostgresTemplateStore : ITemplateStore
             return null;
 
         var version = template.Versions
-            .Where(v => v.IsPublished)
+            .Where(v => VersionStatuses.IsPublished(v.Status) || v.IsPublished)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefault();
 
@@ -61,7 +61,7 @@ public sealed class PostgresTemplateStore : ITemplateStore
             return null;
 
         var version = template.Versions
-            .Where(v => v.IsPublished)
+            .Where(v => VersionStatuses.IsPublished(v.Status) || v.IsPublished)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefault();
 
