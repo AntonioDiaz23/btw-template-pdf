@@ -89,8 +89,11 @@ public static class DatabaseInitializer
             .Where(v => VersionStatuses.IsPublished(v.Status) || v.IsPublished)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefault();
+        var hasDraft = tip is not null && VersionStatuses.IsDraft(tip.Status);
 
-        template.CurrentVersionNumber = tip?.VersionNumber ?? 1;
+        template.CurrentVersionNumber = hasDraft
+            ? tip!.VersionNumber
+            : published?.VersionNumber ?? tip?.VersionNumber ?? 1;
         template.Status = published is null ? "draft" : "published";
     }
 

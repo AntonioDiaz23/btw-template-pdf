@@ -74,4 +74,13 @@ public interface ITemplateCatalog
     Task<TemplateVersionDto> PublishAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task DeleteDraftAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Makes an existing <c>used</c> version the live published one again (no new version number).
+    /// Discards a tip draft if present.
+    /// </summary>
+    Task<TemplateVersionDto> RollbackToVersionAsync(
+        Guid id,
+        int versionNumber,
+        CancellationToken cancellationToken = default);
 }

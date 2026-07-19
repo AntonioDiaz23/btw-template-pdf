@@ -129,3 +129,33 @@ public sealed class DeleteDraftUseCase
         }
     }
 }
+
+public sealed class RollbackTemplateVersionUseCase
+{
+    private readonly ITemplateCatalog _catalog;
+
+    public RollbackTemplateVersionUseCase(ITemplateCatalog catalog) => _catalog = catalog;
+
+    public async Task<TemplateVersionDto> ExecuteAsync(
+        Guid id,
+        int versionNumber,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await _catalog
+                .RollbackToVersionAsync(id, versionNumber, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            throw new AppException(
+                AppErrorCodes.TemplateNotFound,
+                $"Template '{id}' was not found.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new AppException(AppErrorCodes.ValidationError, ex.Message);
+        }
+    }
+}

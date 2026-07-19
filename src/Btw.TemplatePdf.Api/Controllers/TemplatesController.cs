@@ -12,19 +12,22 @@ public sealed class TemplatesController : ControllerBase
     private readonly CreateTemplateUseCase _create;
     private readonly SaveDraftUseCase _saveDraft;
     private readonly DeleteDraftUseCase _deleteDraft;
+    private readonly RollbackTemplateVersionUseCase _rollback;
 
     public TemplatesController(
         ListTemplatesUseCase list,
         GetTemplateUseCase get,
         CreateTemplateUseCase create,
         SaveDraftUseCase saveDraft,
-        DeleteDraftUseCase deleteDraft)
+        DeleteDraftUseCase deleteDraft,
+        RollbackTemplateVersionUseCase rollback)
     {
         _list = list;
         _get = get;
         _create = create;
         _saveDraft = saveDraft;
         _deleteDraft = deleteDraft;
+        _rollback = rollback;
     }
 
     [HttpGet]
@@ -67,5 +70,18 @@ public sealed class TemplatesController : ControllerBase
     {
         await _deleteDraft.ExecuteAsync(id, ct);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Rollback: make a previous <c>used</c> version the live published one again
+    /// (same version number — does not create v+1). Discards an open draft tip if any.
+    /// </summary>
+    [HttpPost("{id:guid}/versions/{versionNumber:int}/rollback")]
+    public async Task<ActionResult<TemplateVersionDto>> Rollback(
+        Guid id,
+        int versionNumber,
+        CancellationToken ct)
+    {
+        return Ok(await _rollback.ExecuteAsync(id, versionNumber, ct));
     }
 }

@@ -105,13 +105,22 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
         if (!string.IsNullOrWhiteSpace(request.Nit))
             template.Nit = request.Nit.Trim();
 
-        // Published / used tips are immutable — fork a new draft.
+        // Published / used tips are immutable — fork a new draft from the live published
+        // version when the tip is an older "used" snapshot (e.g. after rollback).
         if (!VersionStatuses.IsDraft(tip.Status))
         {
+            var published = template.Versions
+                .Where(v => VersionStatuses.IsPublished(v.Status) || v.IsPublished)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
+            var source = VersionStatuses.IsUsed(tip.Status) && published is not null
+                ? published
+                : tip;
+
             var assetsJson = await BrandAssetHydrator.HydrateAssetsJsonAsync(
                     _db,
                     request.AssetsJson,
-                    tip.AssetsJson,
+                    source.AssetsJson,
                     cancellationToken)
                 .ConfigureAwait(false);
 
@@ -120,12 +129,12 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
                 Id = Guid.NewGuid(),
                 TemplateId = template.Id,
                 VersionNumber = tip.VersionNumber + 1,
-                Html = request.Html ?? tip.Html,
-                Css = request.Css ?? tip.Css,
-                SchemaJson = request.SchemaJson ?? tip.SchemaJson,
-                SampleDataJson = request.SampleDataJson ?? tip.SampleDataJson,
-                BlocksJson = request.BlocksJson ?? tip.BlocksJson,
-                PageJson = request.PageJson ?? tip.PageJson,
+                Html = request.Html ?? source.Html,
+                Css = request.Css ?? source.Css,
+                SchemaJson = request.SchemaJson ?? source.SchemaJson,
+                SampleDataJson = request.SampleDataJson ?? source.SampleDataJson,
+                BlocksJson = request.BlocksJson ?? source.BlocksJson,
+                PageJson = request.PageJson ?? source.PageJson,
                 AssetsJson = assetsJson,
                 CreatedAt = now,
                 Status = VersionStatuses.Draft,
@@ -228,6 +237,59 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<TemplateVersionDto> RollbackToVersionAsync(
+        Guid id,
+        int versionNumber,
+        CancellationToken cancellationToken = default)
+    {
+        var template = await _db.Templates
+            .Include(t => t.Versions)
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
+
+        var target = template.Versions.FirstOrDefault(v => v.VersionNumber == versionNumber)
+            ?? throw new InvalidOperationException($"Version {versionNumber} was not found.");
+
+        if (VersionStatuses.IsPublished(target.Status) || target.IsPublished)
+        {
+            DatabaseInitializer.SyncTemplateFlags(template);
+            return MapVersion(target);
+        }
+
+        if (!VersionStatuses.IsUsed(target.Status))
+        {
+            throw new InvalidOperationException(
+                "Solo se puede volver a una versión usada (ya publicada antes).");
+        }
+
+        var tip = Tip(template);
+        if (VersionStatuses.IsDraft(tip.Status))
+        {
+            if (template.Versions.Count <= 1)
+                throw new InvalidOperationException("No se puede descartar el único borrador en rollback.");
+            template.Versions.Remove(tip);
+            _db.TemplateVersions.Remove(tip);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        foreach (var version in template.Versions)
+        {
+            if (VersionStatuses.IsPublished(version.Status) || version.IsPublished)
+            {
+                version.Status = VersionStatuses.Used;
+                version.IsPublished = false;
+            }
+        }
+
+        target.Status = VersionStatuses.Published;
+        target.IsPublished = true;
+        template.UpdatedAt = now;
+        DatabaseInitializer.SyncTemplateFlags(template);
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return MapVersion(target);
+    }
+
     private static TemplateVersionEntity Tip(TemplateEntity template) =>
         template.Versions.OrderByDescending(v => v.VersionNumber).First();
 
@@ -249,13 +311,17 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefault();
         var hasDraft = tip is not null && VersionStatuses.IsDraft(tip.Status);
+        // After rollback, tip may be a higher "used" version — show published (or draft) as current.
+        var currentNumber = hasDraft
+            ? tip!.VersionNumber
+            : published?.VersionNumber ?? tip?.VersionNumber ?? t.CurrentVersionNumber;
 
         return new TemplateDto(
             t.Id,
             t.Name,
             t.DocumentType,
             published is null ? "draft" : "published",
-            tip?.VersionNumber ?? t.CurrentVersionNumber,
+            currentNumber,
             t.UpdatedAt,
             t.Nit,
             t.SectorSalud,
