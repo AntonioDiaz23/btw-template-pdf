@@ -8,15 +8,25 @@ namespace Btw.TemplatePdf.Application.Tests;
 public sealed class PostgresTemplateStoreEfTranslatabilityTests
 {
     [Fact]
-    public void GetPublishedAsync_IQueryable_filter_is_ef_translatable()
+    public void GetPublishedAsync_does_not_call_IsPublished_inside_IQueryable()
     {
         var source = File.ReadAllText(ResolveStorePath());
 
+        // IQueryable must only filter by nit + documentType (property equality).
         Assert.Contains(
-            "t.Versions.Any(v => v.IsPublished || v.Status == VersionStatuses.Published)",
+            ".Where(t => t.Nit == nit && t.DocumentType == docType)",
             source,
             StringComparison.Ordinal);
 
+        // Published selection happens in memory after ToListAsync — never via Any(IsPublished(...)).
+        Assert.DoesNotContain(
+            "Versions.Any(v => VersionStatuses.IsPublished",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Versions.Any(v => v.IsPublished || VersionStatuses.IsPublished",
+            source,
+            StringComparison.Ordinal);
         Assert.DoesNotContain(
             "t.Versions.Any(v => VersionStatuses.IsPublished",
             source,

@@ -24,28 +24,28 @@ public sealed class PostgresTemplateStore : ITemplateStore
     {
         var docType = DocumentTypeMapper.ToApi(documentType);
         // Live PDF uses the published version even while a draft tip is being edited.
-        var template = await _db.Templates
+        // Never call VersionStatuses.IsPublished() inside IQueryable — EF cannot translate it
+        // (InvalidOperationException → 500 on POST /pdf/by-cufe without templateId).
+        // Filter published versions in memory after materializing by nit + documentType.
+        var candidates = await _db.Templates
             .AsNoTracking()
             .Include(t => t.Versions)
-            // VersionStatuses.IsPublished() is not EF-translatable (causes 500 on by-cufe).
-            .Where(t => t.Nit == nit
-                        && t.DocumentType == docType
-                        && t.Versions.Any(v => v.IsPublished || v.Status == VersionStatuses.Published))
+            .Where(t => t.Nit == nit && t.DocumentType == docType)
             .OrderByDescending(t => t.UpdatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        if (template is null)
-            return null;
+        foreach (var template in candidates)
+        {
+            var version = template.Versions
+                .Where(v => v.IsPublished || v.Status == VersionStatuses.Published)
+                .OrderByDescending(v => v.VersionNumber)
+                .FirstOrDefault();
 
-        var version = template.Versions
-            .Where(v => VersionStatuses.IsPublished(v.Status) || v.IsPublished)
-            .OrderByDescending(v => v.VersionNumber)
-            .FirstOrDefault();
+            if (version is not null)
+                return MapDefinition(template, version);
+        }
 
-        if (version is null)
-            return null;
-
-        return MapDefinition(template, version);
+        return null;
     }
 
     public async Task<TemplateDefinition?> GetPublishedByIdAsync(
@@ -62,7 +62,7 @@ public sealed class PostgresTemplateStore : ITemplateStore
             return null;
 
         var version = template.Versions
-            .Where(v => VersionStatuses.IsPublished(v.Status) || v.IsPublished)
+            .Where(v => v.IsPublished || v.Status == VersionStatuses.Published)
             .OrderByDescending(v => v.VersionNumber)
             .FirstOrDefault();
 
