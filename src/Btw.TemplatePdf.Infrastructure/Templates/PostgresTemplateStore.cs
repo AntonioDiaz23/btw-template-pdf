@@ -29,6 +29,7 @@ public sealed class PostgresTemplateStore : ITemplateStore
             .Include(t => t.Versions)
             .Where(t => t.Nit == nit
                         && t.DocumentType == docType
+                        && t.Status != TemplateStatuses.Archived
                         && t.Versions.Any(v => v.IsPublished))
             .OrderByDescending(t => t.UpdatedAt)
             .FirstOrDefaultAsync(cancellationToken);

@@ -1,4 +1,3 @@
-using Btw.TemplatePdf.Infrastructure.Persistence;
 using Btw.TemplatePdf.Infrastructure.Templates;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -94,6 +93,11 @@ public static class DatabaseInitializer
         template.CurrentVersionNumber = hasDraft
             ? tip!.VersionNumber
             : published?.VersionNumber ?? tip?.VersionNumber ?? 1;
+
+        // Preserve soft-archive; do not resurrect archived templates via version sync.
+        if (TemplateStatuses.IsArchived(template.Status))
+            return;
+
         template.Status = published is null ? "draft" : "published";
     }
 
