@@ -107,9 +107,12 @@ public sealed partial class PostgresTemplateCatalog
         var tip = Tip(template);
         var now = DateTimeOffset.UtcNow;
 
+        // Already the live tip — still enforce exclusivity across sibling templates.
         if (VersionStatuses.IsPublished(tip.Status))
         {
             DatabaseInitializer.SyncTemplateFlags(template);
+            await DemoteSiblingPublishedTemplatesAsync(template, now, cancellationToken)
+                .ConfigureAwait(false);
             await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return MapVersion(tip);
         }
@@ -131,8 +134,54 @@ public sealed partial class PostgresTemplateCatalog
         tip.CreatedAt = now;
         template.UpdatedAt = now;
         DatabaseInitializer.SyncTemplateFlags(template);
+
+        await DemoteSiblingPublishedTemplatesAsync(
+                template,
+                now,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return MapVersion(tip);
+    }
+
+    /// <summary>
+    /// Only one live published template per company NIT + document type.
+    /// Sibling templates keep their history as <c>used</c> (still available for CUFE pins).
+    /// </summary>
+    private async Task DemoteSiblingPublishedTemplatesAsync(
+        TemplateEntity publishedTemplate,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var siblings = await _db.Templates
+            .Include(t => t.Versions)
+            .Where(t => t.Id != publishedTemplate.Id
+                        && t.Nit == publishedTemplate.Nit
+                        && t.DocumentType == publishedTemplate.DocumentType
+                        && t.Status != TemplateStatuses.Archived)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var sibling in siblings)
+        {
+            var changed = false;
+            foreach (var version in sibling.Versions)
+            {
+                if (VersionStatuses.IsPublished(version.Status) || version.IsPublished)
+                {
+                    version.Status = VersionStatuses.Used;
+                    version.IsPublished = false;
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+                continue;
+
+            sibling.UpdatedAt = now;
+            DatabaseInitializer.SyncTemplateFlags(sibling);
+        }
     }
 
     public async Task DeleteDraftAsync(Guid id, CancellationToken cancellationToken = default)
