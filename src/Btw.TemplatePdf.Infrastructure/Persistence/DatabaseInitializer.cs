@@ -98,7 +98,15 @@ public static class DatabaseInitializer
         if (TemplateStatuses.IsArchived(template.Status))
             return;
 
-        template.Status = published is null ? "draft" : "published";
+        if (published is not null)
+        {
+            template.Status = TemplateStatuses.Published;
+            return;
+        }
+
+        // Formerly live templates keep a distinct status after another template takes over.
+        var hasUsed = template.Versions.Any(v => VersionStatuses.IsUsed(v.Status));
+        template.Status = hasUsed ? TemplateStatuses.Used : TemplateStatuses.Draft;
     }
 
     private static async Task EnsureInvoiceTemplateBindingsTableAsync(TemplateDbContext db, CancellationToken ct)

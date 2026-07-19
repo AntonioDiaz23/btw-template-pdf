@@ -87,7 +87,11 @@ public sealed partial class PostgresTemplateCatalog
 
         if (VersionStatuses.IsPublished(target.Status) || target.IsPublished)
         {
+            var alreadyLiveAt = DateTimeOffset.UtcNow;
             DatabaseInitializer.SyncTemplateFlags(template);
+            await DemoteSiblingPublishedTemplatesAsync(template, alreadyLiveAt, cancellationToken)
+                .ConfigureAwait(false);
+            await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return MapVersion(target);
         }
 
@@ -120,6 +124,8 @@ public sealed partial class PostgresTemplateCatalog
         target.IsPublished = true;
         template.UpdatedAt = now;
         DatabaseInitializer.SyncTemplateFlags(template);
+        await DemoteSiblingPublishedTemplatesAsync(template, now, cancellationToken)
+            .ConfigureAwait(false);
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return MapVersion(target);
     }

@@ -33,7 +33,11 @@ public sealed partial class PostgresTemplateCatalog
 
         var status = TemplateStatuses.IsArchived(t.Status)
             ? TemplateStatuses.Archived
-            : published is null ? TemplateStatuses.Draft : TemplateStatuses.Published;
+            : published is not null
+                ? TemplateStatuses.Published
+                : t.Versions.Any(v => VersionStatuses.IsUsed(v.Status))
+                    ? TemplateStatuses.Used
+                    : TemplateStatuses.Draft;
 
         return new TemplateDto(
             t.Id,
