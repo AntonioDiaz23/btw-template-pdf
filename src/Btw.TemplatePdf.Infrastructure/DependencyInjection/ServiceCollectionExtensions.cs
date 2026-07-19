@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddSingleton<IUblToViewModelMapper, DianUblToViewModelMapper>();
         services.AddSingleton<IAssetStore, EmbeddedDataUrlAssetStore>();
         services.AddSingleton<IPdfRenderer, PlaywrightPdfRenderer>();
+        services.AddSingleton<IPdfMetadataWriter, PdfSharpMetadataWriter>();
         return services;
     }
 }

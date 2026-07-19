@@ -7,5 +7,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Btw.TemplatePdf.Application.Tests/Btw.TemplatePdf.Application.Tests.csproj" />
+    <Project Path="tests/Btw.TemplatePdf.Infrastructure.Tests/Btw.TemplatePdf.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>
