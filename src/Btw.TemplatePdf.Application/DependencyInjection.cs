@@ -20,6 +20,8 @@ public static class DependencyInjection
         services.AddScoped<CreateTemplateUseCase>();
         services.AddScoped<SaveDraftUseCase>();
         services.AddScoped<DeleteDraftUseCase>();
+        services.AddScoped<ArchiveTemplateUseCase>();
+        services.AddScoped<DeleteTemplateUseCase>();
         services.AddScoped<RollbackTemplateVersionUseCase>();
 
         return services;

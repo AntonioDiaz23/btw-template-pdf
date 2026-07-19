@@ -12,6 +12,8 @@ public sealed class TemplatesController : ControllerBase
     private readonly CreateTemplateUseCase _create;
     private readonly SaveDraftUseCase _saveDraft;
     private readonly DeleteDraftUseCase _deleteDraft;
+    private readonly ArchiveTemplateUseCase _archive;
+    private readonly DeleteTemplateUseCase _delete;
     private readonly RollbackTemplateVersionUseCase _rollback;
 
     public TemplatesController(
@@ -20,6 +22,8 @@ public sealed class TemplatesController : ControllerBase
         CreateTemplateUseCase create,
         SaveDraftUseCase saveDraft,
         DeleteDraftUseCase deleteDraft,
+        ArchiveTemplateUseCase archive,
+        DeleteTemplateUseCase delete,
         RollbackTemplateVersionUseCase rollback)
     {
         _list = list;
@@ -27,6 +31,8 @@ public sealed class TemplatesController : ControllerBase
         _create = create;
         _saveDraft = saveDraft;
         _deleteDraft = deleteDraft;
+        _archive = archive;
+        _delete = delete;
         _rollback = rollback;
     }
 
@@ -81,6 +87,33 @@ public sealed class TemplatesController : ControllerBase
         CancellationToken ct)
     {
         await _deleteDraft.ExecuteAsync(id, nit, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Soft-archive: hide from catalog and live PDF selection; keep versions for pinned CUFEs.
+    /// </summary>
+    [HttpPost("{id:guid}/archive")]
+    public async Task<IActionResult> Archive(
+        Guid id,
+        [FromQuery] string nit,
+        CancellationToken ct)
+    {
+        await _archive.ExecuteAsync(id, nit, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Hard-delete only unused draft templates (never published/used, no invoice bindings).
+    /// Otherwise returns 409 — use archive instead.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        [FromQuery] string nit,
+        CancellationToken ct)
+    {
+        await _delete.ExecuteAsync(id, nit, ct);
         return NoContent();
     }
 

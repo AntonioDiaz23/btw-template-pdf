@@ -46,6 +46,7 @@ public sealed class AppExceptionMiddleware
         {
             AppErrorCodes.ValidationError => StatusCodes.Status400BadRequest,
             AppErrorCodes.TemplateNotFound or AppErrorCodes.InvoiceNotFound => StatusCodes.Status404NotFound,
+            AppErrorCodes.Conflict => StatusCodes.Status409Conflict,
             AppErrorCodes.MappingError => StatusCodes.Status422UnprocessableEntity,
             AppErrorCodes.DianUpstreamError => StatusCodes.Status502BadGateway,
             AppErrorCodes.RenderError => StatusCodes.Status500InternalServerError,

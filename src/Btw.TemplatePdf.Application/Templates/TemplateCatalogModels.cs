@@ -77,6 +77,16 @@ public interface ITemplateCatalog
     Task DeleteDraftAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Soft-archive: hide from catalog and live PDF lookup, keep all versions for pinned CUFEs.
+    /// </summary>
+    Task ArchiveAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Hard-delete only when the template was never published/used and has no invoice bindings.
+    /// </summary>
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Makes an existing <c>used</c> version the live published one again (no new version number).
     /// Discards a tip draft if present.
     /// </summary>

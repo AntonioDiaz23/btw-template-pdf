@@ -25,4 +25,6 @@ public static class AppErrorCodes
     public const string MappingError = "mapping_error";
     public const string RenderError = "render_error";
     public const string DianUpstreamError = "dian_upstream_error";
+    /// <summary>Resource cannot be deleted/changed because it is in use (e.g. pinned invoices).</summary>
+    public const string Conflict = "conflict";
 }

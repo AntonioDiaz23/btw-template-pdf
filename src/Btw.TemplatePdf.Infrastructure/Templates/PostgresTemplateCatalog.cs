@@ -21,7 +21,7 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
         var templates = await _db.Templates
             .AsNoTracking()
             .Include(t => t.Versions)
-            .Where(t => t.Nit == nit)
+            .Where(t => t.Nit == nit && t.Status != TemplateStatuses.Archived)
             .OrderByDescending(t => t.UpdatedAt)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -99,6 +99,8 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
+
+        EnsureNotArchived(template);
 
         var tip = Tip(template);
         var now = DateTimeOffset.UtcNow;
@@ -185,6 +187,8 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             .ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
 
+        EnsureNotArchived(template);
+
         var tip = Tip(template);
         var now = DateTimeOffset.UtcNow;
 
@@ -225,6 +229,8 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             .ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
 
+        EnsureNotArchived(template);
+
         var tip = Tip(template);
         if (!VersionStatuses.IsDraft(tip.Status))
             throw new InvalidOperationException("Only a draft tip can be discarded.");
@@ -240,6 +246,70 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
         await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task ArchiveAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var template = await _db.Templates
+            .Include(t => t.Versions)
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
+
+        if (TemplateStatuses.IsArchived(template.Status))
+            return;
+
+        // Demote live published tip so GetPublished cannot select this template.
+        foreach (var version in template.Versions)
+        {
+            if (VersionStatuses.IsPublished(version.Status) || version.IsPublished)
+            {
+                version.Status = VersionStatuses.Used;
+                version.IsPublished = false;
+            }
+        }
+
+        template.Status = TemplateStatuses.Archived;
+        template.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var template = await _db.Templates
+            .Include(t => t.Versions)
+            .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
+
+        if (TemplateStatuses.IsArchived(template.Status))
+        {
+            throw new InvalidOperationException(
+                "La plantilla está archivada. No se puede eliminar: conserva versiones para facturas ya graficadas.");
+        }
+
+        var hasReleasedVersion = template.Versions.Any(v =>
+            VersionStatuses.IsPublished(v.Status)
+            || VersionStatuses.IsUsed(v.Status)
+            || v.IsPublished);
+        if (hasReleasedVersion)
+        {
+            throw new InvalidOperationException(
+                "La plantilla ya fue publicada. Archívala para ocultarla sin romper facturas pineadas.");
+        }
+
+        var bindingCount = await _db.InvoiceTemplateBindings
+            .CountAsync(b => b.TemplateId == id, cancellationToken)
+            .ConfigureAwait(false);
+        if (bindingCount > 0)
+        {
+            throw new InvalidOperationException(
+                "Hay facturas vinculadas a esta plantilla. Archívala en lugar de eliminarla.");
+        }
+
+        _db.TemplateVersions.RemoveRange(template.Versions);
+        _db.Templates.Remove(template);
+        await _db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<TemplateVersionDto> RollbackToVersionAsync(
         Guid id,
         int versionNumber,
@@ -250,6 +320,8 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new KeyNotFoundException($"Template '{id}' was not found.");
+
+        EnsureNotArchived(template);
 
         var target = template.Versions.FirstOrDefault(v => v.VersionNumber == versionNumber)
             ?? throw new InvalidOperationException($"Version {versionNumber} was not found.");
@@ -319,17 +391,30 @@ public sealed class PostgresTemplateCatalog : ITemplateCatalog
             ? tip!.VersionNumber
             : published?.VersionNumber ?? tip?.VersionNumber ?? t.CurrentVersionNumber;
 
+        var status = TemplateStatuses.IsArchived(t.Status)
+            ? TemplateStatuses.Archived
+            : published is null ? TemplateStatuses.Draft : TemplateStatuses.Published;
+
         return new TemplateDto(
             t.Id,
             t.Name,
             t.DocumentType,
-            published is null ? "draft" : "published",
+            status,
             currentNumber,
             t.UpdatedAt,
             t.Nit,
             t.SectorSalud,
             published?.VersionNumber ?? 0,
             hasDraft);
+    }
+
+    private static void EnsureNotArchived(TemplateEntity template)
+    {
+        if (TemplateStatuses.IsArchived(template.Status))
+        {
+            throw new InvalidOperationException(
+                "La plantilla está archivada y no se puede modificar.");
+        }
     }
 
     private static TemplateVersionDto MapVersion(TemplateVersionEntity v)

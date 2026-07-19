@@ -199,6 +199,91 @@ public sealed class DeleteDraftUseCase
     }
 }
 
+public sealed class ArchiveTemplateUseCase
+{
+    private readonly ITemplateCatalog _catalog;
+
+    public ArchiveTemplateUseCase(ITemplateCatalog catalog) => _catalog = catalog;
+
+    public async Task ExecuteAsync(
+        Guid id,
+        string nit,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = NitNormalizer.Normalize(nit);
+        if (string.IsNullOrEmpty(normalized))
+        {
+            throw new AppException(AppErrorCodes.ValidationError, "nit is required.");
+        }
+
+        var bundle = await _catalog.GetBundleAsync(id, cancellationToken).ConfigureAwait(false);
+        if (bundle is null || !NitNormalizer.Matches(bundle.Template.Nit, normalized))
+        {
+            throw new AppException(
+                AppErrorCodes.TemplateNotFound,
+                $"Template '{id}' was not found.");
+        }
+
+        try
+        {
+            await _catalog.ArchiveAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            throw new AppException(
+                AppErrorCodes.TemplateNotFound,
+                $"Template '{id}' was not found.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new AppException(AppErrorCodes.ValidationError, ex.Message);
+        }
+    }
+}
+
+public sealed class DeleteTemplateUseCase
+{
+    private readonly ITemplateCatalog _catalog;
+
+    public DeleteTemplateUseCase(ITemplateCatalog catalog) => _catalog = catalog;
+
+    public async Task ExecuteAsync(
+        Guid id,
+        string nit,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = NitNormalizer.Normalize(nit);
+        if (string.IsNullOrEmpty(normalized))
+        {
+            throw new AppException(AppErrorCodes.ValidationError, "nit is required.");
+        }
+
+        var bundle = await _catalog.GetBundleAsync(id, cancellationToken).ConfigureAwait(false);
+        if (bundle is null || !NitNormalizer.Matches(bundle.Template.Nit, normalized))
+        {
+            throw new AppException(
+                AppErrorCodes.TemplateNotFound,
+                $"Template '{id}' was not found.");
+        }
+
+        try
+        {
+            await _catalog.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        }
+        catch (KeyNotFoundException)
+        {
+            throw new AppException(
+                AppErrorCodes.TemplateNotFound,
+                $"Template '{id}' was not found.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Published / bound templates must be archived — surface as 409.
+            throw new AppException(AppErrorCodes.Conflict, ex.Message);
+        }
+    }
+}
+
 public sealed class RollbackTemplateVersionUseCase
 {
     private readonly ITemplateCatalog _catalog;

@@ -5,6 +5,7 @@ public sealed class TemplateEntity
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string DocumentType { get; set; } = "factura";
+    /// <summary>draft | published | archived</summary>
     public string Status { get; set; } = "draft";
     public int CurrentVersionNumber { get; set; } = 1;
     /// <summary>Company NIT used for published PDF lookup.</summary>

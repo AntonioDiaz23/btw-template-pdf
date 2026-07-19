@@ -182,4 +182,67 @@ public sealed class TemplateUseCaseTests
 
         Assert.Equal(AppErrorCodes.TemplateNotFound, ex.Code);
     }
+
+    [Fact]
+    public async Task Archive_WhenWrongNit_ThrowsTemplateNotFound()
+    {
+        var id = Guid.NewGuid();
+        var bundle = new TemplateBundleDto(
+            new TemplateDto(id, "Demo", "factura", "published", 1, DateTimeOffset.UtcNow, "900000000", false),
+            Array.Empty<TemplateVersionDto>());
+        _catalog.GetBundleAsync(id, Arg.Any<CancellationToken>()).Returns(bundle);
+
+        var sut = new ArchiveTemplateUseCase(_catalog);
+        var ex = await Assert.ThrowsAsync<AppException>(() => sut.ExecuteAsync(id, "111111111"));
+
+        Assert.Equal(AppErrorCodes.TemplateNotFound, ex.Code);
+        await _catalog.DidNotReceive().ArchiveAsync(id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Archive_WhenOwned_CallsCatalog()
+    {
+        var id = Guid.NewGuid();
+        var bundle = new TemplateBundleDto(
+            new TemplateDto(id, "Demo", "factura", "published", 1, DateTimeOffset.UtcNow, "900000000", false),
+            Array.Empty<TemplateVersionDto>());
+        _catalog.GetBundleAsync(id, Arg.Any<CancellationToken>()).Returns(bundle);
+
+        var sut = new ArchiveTemplateUseCase(_catalog);
+        await sut.ExecuteAsync(id, "900000000");
+
+        await _catalog.Received(1).ArchiveAsync(id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Delete_WhenPublished_MapsToConflict()
+    {
+        var id = Guid.NewGuid();
+        var bundle = new TemplateBundleDto(
+            new TemplateDto(id, "Demo", "factura", "published", 1, DateTimeOffset.UtcNow, "900000000", false),
+            Array.Empty<TemplateVersionDto>());
+        _catalog.GetBundleAsync(id, Arg.Any<CancellationToken>()).Returns(bundle);
+        _catalog.When(c => c.DeleteAsync(id, Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("La plantilla ya fue publicada."));
+
+        var sut = new DeleteTemplateUseCase(_catalog);
+        var ex = await Assert.ThrowsAsync<AppException>(() => sut.ExecuteAsync(id, "900000000"));
+
+        Assert.Equal(AppErrorCodes.Conflict, ex.Code);
+    }
+
+    [Fact]
+    public async Task Delete_WhenUnusedDraft_CallsCatalog()
+    {
+        var id = Guid.NewGuid();
+        var bundle = new TemplateBundleDto(
+            new TemplateDto(id, "Demo", "factura", "draft", 1, DateTimeOffset.UtcNow, "900000000", false),
+            Array.Empty<TemplateVersionDto>());
+        _catalog.GetBundleAsync(id, Arg.Any<CancellationToken>()).Returns(bundle);
+
+        var sut = new DeleteTemplateUseCase(_catalog);
+        await sut.ExecuteAsync(id, "900000000");
+
+        await _catalog.Received(1).DeleteAsync(id, Arg.Any<CancellationToken>());
+    }
 }
