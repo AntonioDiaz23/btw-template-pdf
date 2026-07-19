@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining<GeneratePdfByCufeRequestValidator>();
 
         services.AddScoped<GeneratePdfByCufeUseCase>();
+        services.AddScoped<GetInvoiceTemplateBindingUseCase>();
         services.AddScoped<GetUblByCufeUseCase>();
         services.AddScoped<ListTemplatesUseCase>();
         services.AddScoped<GetTemplateUseCase>();

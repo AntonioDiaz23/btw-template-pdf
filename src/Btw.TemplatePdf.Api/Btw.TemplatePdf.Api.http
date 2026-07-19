@@ -1,6 +1,10 @@
 @Btw.TemplatePdf.Api_HostAddress = http://localhost:5299
 
 ### Generate PDF by CUFE (demo NIT / stub UBL fallback)
+GET {{Btw.TemplatePdf.Api_HostAddress}}/api/v1/pdf/bindings/by-cufe?nit=900665411&cufe={{cufe}}
+Accept: application/json
+
+###
 POST {{Btw.TemplatePdf.Api_HostAddress}}/api/v1/pdf/by-cufe
 Content-Type: application/json
 
