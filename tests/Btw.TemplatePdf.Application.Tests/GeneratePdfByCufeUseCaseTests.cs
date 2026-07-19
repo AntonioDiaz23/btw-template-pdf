@@ -18,18 +18,24 @@ public sealed class GeneratePdfByCufeUseCaseTests
     private readonly IUblToViewModelMapper _mapper = Substitute.For<IUblToViewModelMapper>();
     private readonly IAssetStore _assets = Substitute.For<IAssetStore>();
     private readonly IPdfRenderer _renderer = Substitute.For<IPdfRenderer>();
+    private readonly IPdfMetadataWriter _metadata = Substitute.For<IPdfMetadataWriter>();
     private readonly IValidator<GeneratePdfByCufeRequest> _validator = new GeneratePdfByCufeRequestValidator();
 
-    private GeneratePdfByCufeUseCase CreateSut() =>
-        new(
+    private GeneratePdfByCufeUseCase CreateSut()
+    {
+        _metadata.Apply(Arg.Any<byte[]>(), Arg.Any<PdfFileMetadata>())
+            .Returns(ci => ci.ArgAt<byte[]>(0));
+        return new(
             _templates,
             _bindings,
             _ubl,
             _mapper,
             _assets,
             _renderer,
+            _metadata,
             _validator,
             NullLogger<GeneratePdfByCufeUseCase>.Instance);
+    }
 
     [Fact]
     public async Task ExecuteAsync_WhenValid_ReturnsPdfBase64_AndPinsTemplate()
@@ -71,6 +77,12 @@ public sealed class GeneratePdfByCufeUseCaseTests
         Assert.Equal(2, result.TemplateVersion);
         Assert.False(result.ReusedPinnedTemplate);
         Assert.False(string.IsNullOrWhiteSpace(result.PdfBase64));
+        _metadata.Received(1).Apply(
+            Arg.Any<byte[]>(),
+            Arg.Is<PdfFileMetadata>(m =>
+                m.Creator == "BTW Template PDF" &&
+                m.Producer == "BTW Template PDF" &&
+                m.Author == "NIT 900000000"));
         await _bindings.Received(1).SaveAsync(
             Arg.Is<InvoiceTemplateBinding>(b =>
                 b.Cufe == "ABCDEFGH" &&

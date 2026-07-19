@@ -87,3 +87,22 @@ public interface IPdfRenderer
         IReadOnlyDictionary<string, byte[]> assets,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// Writes PDF Info dictionary metadata onto an already-rendered PDF (in memory).
+/// </summary>
+public interface IPdfMetadataWriter
+{
+    byte[] Apply(byte[] pdfBytes, PdfFileMetadata metadata);
+}
+
+/// <summary>Standard PDF document information (Info dictionary).</summary>
+public sealed record PdfFileMetadata(
+    string Title,
+    string Author,
+    string Subject,
+    string Keywords,
+    string Creator,
+    string Producer,
+    DateTime CreationDateUtc,
+    DateTime ModificationDateUtc);

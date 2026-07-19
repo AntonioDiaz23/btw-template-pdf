@@ -22,6 +22,7 @@ public sealed class GeneratePdfByCufeUseCase
     private readonly IUblToViewModelMapper _mapper;
     private readonly IAssetStore _assets;
     private readonly IPdfRenderer _renderer;
+    private readonly IPdfMetadataWriter _metadataWriter;
     private readonly IValidator<GeneratePdfByCufeRequest> _validator;
     private readonly ILogger<GeneratePdfByCufeUseCase> _logger;
 
@@ -32,6 +33,7 @@ public sealed class GeneratePdfByCufeUseCase
         IUblToViewModelMapper mapper,
         IAssetStore assets,
         IPdfRenderer renderer,
+        IPdfMetadataWriter metadataWriter,
         IValidator<GeneratePdfByCufeRequest> validator,
         ILogger<GeneratePdfByCufeUseCase> logger)
     {
@@ -41,6 +43,7 @@ public sealed class GeneratePdfByCufeUseCase
         _mapper = mapper;
         _assets = assets;
         _renderer = renderer;
+        _metadataWriter = metadataWriter;
         _validator = validator;
         _logger = logger;
     }
@@ -149,6 +152,18 @@ public sealed class GeneratePdfByCufeUseCase
                 $"PDF render failed: {ex.Message}");
         }
 
+        try
+        {
+            var metadata = PdfFileMetadataFactory.FromTemplate(template, invoice);
+            pdfBytes = _metadataWriter.Apply(pdfBytes, metadata);
+        }
+        catch (Exception ex)
+        {
+            throw new PdfGenerationException(
+                AppErrorCodes.RenderError,
+                $"PDF metadata could not be applied: {ex.Message}");
+        }
+
         var bindingReplaced = false;
         if (!hasPin)
         {
@@ -187,7 +202,6 @@ public sealed class GeneratePdfByCufeUseCase
             reusedPinned,
             bindingReplaced);
 
-        var shortCufe = cufe.Length <= 8 ? cufe : cufe[..8];
         return new GeneratePdfByCufeResponse(
             Nit: nit,
             Cufe: cufe,
@@ -195,7 +209,7 @@ public sealed class GeneratePdfByCufeUseCase
             TemplateId: template.TemplateId,
             TemplateVersion: template.Version,
             ContentType: "application/pdf",
-            FileName: $"FE-{nit}-{shortCufe}.pdf",
+            FileName: PdfFileMetadataFactory.BuildFileName(invoice, nit, cufe),
             PdfBase64: Convert.ToBase64String(pdfBytes),
             ReusedPinnedTemplate: reusedPinned,
             BindingReplaced: bindingReplaced);
