@@ -1,3 +1,4 @@
+using Btw.TemplatePdf.Application.BrandAssets;
 using Btw.TemplatePdf.Application.Pdf;
 using Btw.TemplatePdf.Application.Templates;
 using Btw.TemplatePdf.Application.Ubl;
@@ -43,8 +44,11 @@ public static class DependencyInjection
         services.AddScoped<ITemplateStore, PostgresTemplateStore>();
         services.AddScoped<IInvoiceTemplateBindingStore, PostgresInvoiceTemplateBindingStore>();
         services.AddScoped<ITemplateCatalog, PostgresTemplateCatalog>();
+        services.AddScoped<IBrandAssetStore, PostgresBrandAssetStore>();
         services.AddSingleton<IUblToViewModelMapper, DianUblToViewModelMapper>();
         services.AddSingleton<IAssetStore, EmbeddedDataUrlAssetStore>();
+        services.AddSingleton<PlaywrightBrowserPool>();
+        services.AddHostedService<PlaywrightWarmupHostedService>();
         services.AddSingleton<IPdfRenderer, PlaywrightPdfRenderer>();
         services.AddSingleton<IPdfMetadataWriter, PdfSharpMetadataWriter>();
         return services;
