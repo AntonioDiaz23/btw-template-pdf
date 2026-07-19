@@ -9,7 +9,7 @@
 | `Domain` | `TemplateDefinition`, `InvoiceViewModel`, ports (`ITemplateStore`, `IUblStore`, …) |
 | `Application` | Use case `GeneratePdfByCufeUseCase` |
 | `Infrastructure` | PostgreSQL templates, stub UBL/PDF adapters |
-| `Api` | REST templates CRUD + `POST /api/v1/pdf/by-cufe` |
+| `Api` | REST templates CRUD + `POST /api/v1/pdf/by-cufe` + `GET /api/v1/pdf/bindings/by-cufe` |
 
 ## Prerequisites
 

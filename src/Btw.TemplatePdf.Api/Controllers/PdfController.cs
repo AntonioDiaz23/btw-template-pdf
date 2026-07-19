@@ -8,11 +8,15 @@ namespace Btw.TemplatePdf.Api.Controllers;
 [Route("api/v1/pdf")]
 public sealed class PdfController : ControllerBase
 {
-    private readonly GeneratePdfByCufeUseCase _useCase;
+    private readonly GeneratePdfByCufeUseCase _generatePdf;
+    private readonly GetInvoiceTemplateBindingUseCase _getBinding;
 
-    public PdfController(GeneratePdfByCufeUseCase useCase)
+    public PdfController(
+        GeneratePdfByCufeUseCase generatePdf,
+        GetInvoiceTemplateBindingUseCase getBinding)
     {
-        _useCase = useCase;
+        _generatePdf = generatePdf;
+        _getBinding = getBinding;
     }
 
     public sealed record ByCufeBody(string Nit, string Cufe, string? DocumentType);
@@ -26,8 +30,26 @@ public sealed class PdfController : ControllerBase
         CancellationToken cancellationToken)
     {
         var documentType = ParseDocumentType(body.DocumentType);
-        var result = await _useCase.ExecuteAsync(
+        var result = await _generatePdf.ExecuteAsync(
             new GeneratePdfByCufeRequest(body.Nit, body.Cufe, documentType),
+            cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// GET /api/v1/pdf/bindings/by-cufe?nit=…&amp;cufe=…
+    /// Returns whether this invoice was already rendered (invoice_template_bindings).
+    /// </summary>
+    [HttpGet("bindings/by-cufe")]
+    [ProducesResponseType(typeof(GetInvoiceTemplateBindingResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<GetInvoiceTemplateBindingResponse>> BindingByCufe(
+        [FromQuery] string nit,
+        [FromQuery] string cufe,
+        CancellationToken cancellationToken)
+    {
+        var result = await _getBinding.ExecuteAsync(
+            new GetInvoiceTemplateBindingRequest(nit, cufe),
             cancellationToken);
         return Ok(result);
     }

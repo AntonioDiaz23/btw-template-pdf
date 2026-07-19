@@ -73,3 +73,13 @@ public sealed class GetUblByCufeRequestValidator : AbstractValidator<GetUblByCuf
         RuleFor(x => x.Cufe).NotEmpty().WithMessage("cufe is required.");
     }
 }
+
+public sealed class GetInvoiceTemplateBindingRequestValidator
+    : AbstractValidator<GetInvoiceTemplateBindingRequest>
+{
+    public GetInvoiceTemplateBindingRequestValidator()
+    {
+        RuleFor(x => x.Nit).NotEmpty().WithMessage("nit is required.");
+        RuleFor(x => x.Cufe).NotEmpty().WithMessage("cufe is required.");
+    }
+}
