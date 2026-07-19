@@ -1,3 +1,4 @@
+using Btw.TemplatePdf.Application.BrandAssets;
 using Btw.TemplatePdf.Application.Pdf;
 using Btw.TemplatePdf.Application.Templates;
 using Btw.TemplatePdf.Application.Ubl;
@@ -23,6 +24,11 @@ public static class DependencyInjection
         services.AddScoped<ArchiveTemplateUseCase>();
         services.AddScoped<DeleteTemplateUseCase>();
         services.AddScoped<RollbackTemplateVersionUseCase>();
+
+        services.AddScoped<ListBrandAssetsUseCase>();
+        services.AddScoped<GetBrandAssetContentUseCase>();
+        services.AddScoped<UploadBrandAssetUseCase>();
+        services.AddScoped<DeleteBrandAssetUseCase>();
 
         return services;
     }
