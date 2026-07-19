@@ -316,17 +316,112 @@ dotnet run --project src/Btw.TemplatePdf.Api --launch-profile http
 - API: http://localhost:5299  
 - Swagger: http://localhost:5299/swagger — **Authorize** con `Bearer <fe-jwt>`
 
-### Docker (linux/amd64)
+### Docker Desktop (local — recomendado para revisión)
 
-Las imágenes de producción deben ser **amd64** (servidor amd64; Mac Apple Silicon es arm64).
+Sirve para levantar **API + PostgreSQL** sin instalar .NET ni Postgres en el host. Requiere [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y en ejecución (Windows, macOS o Linux).
+
+#### 1. Prerrequisitos
+
+1. Abrir **Docker Desktop** y esperar a que el motor esté en verde / *Running*.  
+2. Clonar el repo canónico y situarse en la raíz del proyecto:
 
 ```bash
-cp .env.example .env
-docker compose up -d --build
-# API: http://localhost:8080/swagger
+git clone https://github.com/AntonioDiaz23/btw-template-pdf.git
+cd btw-template-pdf
+git checkout main
+git pull origin main
+```
 
+#### 2. Variables de entorno
+
+```bash
+# Windows (PowerShell)
+Copy-Item .env.example .env
+
+# macOS / Linux
+cp .env.example .env
+```
+
+Para revisión local conviene dejar (o ajustar) en `.env`:
+
+```env
+ASPNETCORE_ENVIRONMENT=Development
+API_PORT=8080
+POSTGRES_USER=btw
+POSTGRES_PASSWORD=btw
+POSTGRES_DB=btw_template_pdf
+POSTGRES_PORT=5433
+FEDIAN_ALLOW_STUB_FALLBACK=true
+SWAGGER_ENABLED=true
+```
+
+`FEDIAN_AUTH_KEY` puede quedar vacío si usas el stub de demo. No subas `.env` con secretos reales.
+
+#### 3. Construir y arrancar
+
+Desde la **raíz** del repo (donde están `docker-compose.yml` y `Dockerfile`):
+
+```bash
+docker compose up -d --build
+```
+
+La **primera** construcción tarda varios minutos (SDK .NET + Chromium de Playwright dentro de la imagen). En Docker Desktop verás los contenedores:
+
+| Contenedor | Rol | Puerto en el host |
+|---|---|---|
+| `btw-template-pdf-api` | API | **8080** → http://localhost:8080 |
+| `btw-template-pdf-db` | PostgreSQL | **5433** → `localhost:5433` |
+
+#### 4. Verificar que corre
+
+```bash
+docker compose ps
+docker compose logs -f api
+```
+
+Abrir Swagger: **http://localhost:8080/swagger**
+
+Health rápido:
+
+```bash
+curl http://localhost:8080/swagger/index.html
+```
+
+#### 5. Comandos útiles del día a día
+
+```bash
+# Ver logs de la API
+docker compose logs -f api
+
+# Reiniciar solo la API (tras cambiar .env)
+docker compose up -d api
+
+# Parar todo (conserva el volumen de Postgres)
+docker compose stop
+
+# Parar y eliminar contenedores (conserva datos en el volumen)
+docker compose down
+
+# Parar y borrar también la base de datos local del volumen
+docker compose down -v
+```
+
+#### 6. Notas para quien revisa
+
+- La imagen se construye como **linux/amd64** (paridad con el servidor). En Mac Apple Silicon Docker Desktop usa emulación; puede ir más lento, pero funciona.  
+- El esquema de BD se crea al arrancar la API (`DatabaseInitializer`).  
+- Demo UBL / PDF: NIT `900000000` cuando `FEDIAN_ALLOW_STUB_FALLBACK=true` (ver `Btw.TemplatePdf.Api.http`).  
+- Si el puerto 8080 o 5433 están ocupados, cámbialos en `.env` (`API_PORT`, `POSTGRES_PORT`) y vuelve a `docker compose up -d`.
+
+### Publicar imagen (servidor / Docker Hub)
+
+Solo si necesitas subir la imagen a un registry (no hace falta para revisar en local):
+
+```bash
 ./scripts/docker-build-push.sh
-# o: docker build --platform linux/amd64 -t ingluigii/btw-template-pdf:latest .
+# o:
+docker build --platform linux/amd64 -t ingluigii/btw-template-pdf:latest .
+docker push ingluigii/btw-template-pdf:latest
 ```
 
 ### FE / UBL
